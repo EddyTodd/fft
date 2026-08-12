@@ -1,18 +1,33 @@
-# Benchmark results
+# Benchmark and accuracy results
 
-`baseline-linux-amd-epyc-gcc14.csv` is a development baseline captured while building v1. It makes the repository empirical from its first revision; it is not a claim of universal hardware rankings.
+This directory keeps **raw measurements and their provenance**, not just screenshots or headline numbers.
 
-Environment:
+## Datasets
 
-- CPU model exposed to the container: AMD EPYC 9V74 80-Core Processor
-- architecture: x86_64
-- OS kernel: Linux 6.18.35
-- compiler: GCC 14.2.0
-- build: CMake `Release`, `FFT_NATIVE=OFF`
-- samples: 31 per algorithm/size
-- warmups: 5
-- adaptive target duration: 1 ms per timing sample
+### `baseline-linux-amd-epyc-gcc14.csv`
 
-The environment is virtualized/containerized, so absolute timing should not be treated as a physical-hardware reference. The CSV is primarily useful for validating the benchmark pipeline and preserving the observations that motivated the initial dispatcher.
+The original v1 development baseline. It predates the formal randomized multi-session protocol and is retained for historical continuity.
 
-For portfolio-quality hardware claims, regenerate the suite on a named physical machine using the methodology in the root README and commit its environment metadata beside the CSV.
+### `pr2-research-baseline/`
+
+The first formal research dataset for the expanded algorithm set. It contains:
+
+- `metadata.json` — exact source commit, environment, and protocol;
+- `raw/timings-N*-session*.csv` — every raw timing sample with session and randomized execution order;
+- `complexity.csv` — structural operation/workspace models for measured algorithm/size pairs;
+- `raw/accuracy-N*.csv` — forward/backward normed error across deterministic signal families;
+- `ANALYSIS.md` — timing rankings, bootstrap confidence intervals, robust dispersion, and effect sizes;
+- `ACCURACY_ANALYSIS.md` — accuracy ranking by worst forward L2 error across signal families.
+
+The environment is containerized/virtualized, so absolute timings are **pipeline/research-development evidence**, not a substitute for results from a named physical machine with controlled power, affinity, and thermal state.
+
+## Interpretation rules
+
+1. Do not call an implementation universally “fastest” from these files.
+2. Distinguish structural operation counts from measured latency.
+3. Distinguish setup/allocation-inclusive call latency from planned execution-only FFT libraries.
+4. Preserve raw samples and metadata when adding a result.
+5. Treat tiny differences with uncertainty intervals spanning parity as statistically unresolved.
+6. Update `SUMMARY.md` only with claims supported by checked-in data.
+
+The full protocol is in [`../docs/EXPERIMENTS.md`](../docs/EXPERIMENTS.md).

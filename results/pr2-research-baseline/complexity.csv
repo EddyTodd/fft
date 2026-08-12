@@ -1,0 +1,43 @@
+algorithm,N,structural_complex_adds,structural_complex_multiplies,peak_workspace_complex,note
+auto,64,384,192,0,canonical radix-2 butterflies; excludes twiddle-generation arithmetic
+mixed-radix,64,384,768,128,structural count for this pedagogical mixed-radix implementation
+bluestein,64,2688,1600,320,three radix-2 FFTs + pointwise convolution + chirps
+radix2-iterative,64,384,192,0,canonical radix-2 butterflies; excludes twiddle-generation arithmetic
+radix2-recursive,64,384,192,128,canonical radix-2 butterflies; excludes twiddle-generation arithmetic
+stockham-radix2,64,384,192,64,canonical radix-2 butterflies; excludes twiddle-generation arithmetic
+radix4,64,384,144,64,optimized radix-4 butterfly; +/-i treated as trivial
+split-radix,64,384,114,64,split-radix recurrence; +/-i treated as trivial
+dft,64,4032,4096,64,direct DFT structural count
+auto,127,6270,3328,891,Rader reduction to cyclic convolution; permutation/root setup excluded
+mixed-radix,127,16002,16129,127,direct DFT structural count
+bluestein,127,6144,3582,639,three radix-2 FFTs + pointwise convolution + chirps
+rader,127,6270,3328,891,Rader reduction to cyclic convolution; permutation/root setup excluded
+dft,127,16002,16129,127,direct DFT structural count
+auto,256,2048,1024,0,canonical radix-2 butterflies; excludes twiddle-generation arithmetic
+mixed-radix,256,2048,4096,512,structural count for this pedagogical mixed-radix implementation
+bluestein,256,13824,7936,1280,three radix-2 FFTs + pointwise convolution + chirps
+radix2-iterative,256,2048,1024,0,canonical radix-2 butterflies; excludes twiddle-generation arithmetic
+radix2-recursive,256,2048,1024,512,canonical radix-2 butterflies; excludes twiddle-generation arithmetic
+stockham-radix2,256,2048,1024,256,canonical radix-2 butterflies; excludes twiddle-generation arithmetic
+radix4,256,2048,768,256,optimized radix-4 butterfly; +/-i treated as trivial
+split-radix,256,2048,626,256,split-radix recurrence; +/-i treated as trivial
+dft,256,65280,65536,256,direct DFT structural count
+auto,509,31228,16384,3573,Rader reduction to cyclic convolution; permutation/root setup excluded
+mixed-radix,509,258572,259081,509,direct DFT structural count
+bluestein,509,30720,17402,2557,three radix-2 FFTs + pointwise convolution + chirps
+rader,509,31228,16384,3573,Rader reduction to cyclic convolution; permutation/root setup excluded
+dft,509,258572,259081,509,direct DFT structural count
+auto,1009,68592,35840,7121,Rader reduction to cyclic convolution; permutation/root setup excluded
+mixed-radix,1009,1.01707e+06,1.01808e+06,1009,direct DFT structural count
+bluestein,1009,67584,37858,5105,three radix-2 FFTs + pointwise convolution + chirps
+rader,1009,68592,35840,7121,Rader reduction to cyclic convolution; permutation/root setup excluded
+dft,1009,1.01707e+06,1.01808e+06,1009,direct DFT structural count
+auto,1024,10240,5120,0,canonical radix-2 butterflies; excludes twiddle-generation arithmetic
+mixed-radix,1024,10240,20480,2048,structural count for this pedagogical mixed-radix implementation
+bluestein,1024,67584,37888,5120,three radix-2 FFTs + pointwise convolution + chirps
+radix2-iterative,1024,10240,5120,0,canonical radix-2 butterflies; excludes twiddle-generation arithmetic
+radix2-recursive,1024,10240,5120,2048,canonical radix-2 butterflies; excludes twiddle-generation arithmetic
+stockham-radix2,1024,10240,5120,1024,canonical radix-2 butterflies; excludes twiddle-generation arithmetic
+radix4,1024,10240,3840,1024,optimized radix-4 butterfly; +/-i treated as trivial
+split-radix,1024,10240,3186,1024,split-radix recurrence; +/-i treated as trivial
+dft,1024,1.04755e+06,1.04858e+06,1024,direct DFT structural count
