@@ -2,212 +2,239 @@
 
 ## Objective
 
-Measure FFT implementations in a way that permits reproducible claims about **latency, variability, numerical accuracy, planning cost, amortization, and crossover behavior**, while keeping theoretical arithmetic complexity separate from observed machine performance.
+Measure FFT implementations in a way that permits reproducible claims about **latency, variability, numerical accuracy, planning cost, amortization, machine-level optimization, and crossover behavior**, while keeping mathematical complexity separate from observed implementation performance.
 
-## Pre-registered hypotheses for the current implementation
+## Research layers
 
-H1. The direct DFT will show the expected quadratic scaling and rapidly lose to FFT families as N grows.
+The repository intentionally has several benchmark layers because they answer different questions:
 
-H2. Lower structural arithmetic count will not imply lower latency. In particular, this pedagogical recursive split-radix implementation may lose to iterative radix-2 because of allocation, recursion, trigonometric evaluation, and locality.
+1. **algorithm calls** — direct DFT, radix families, mixed-radix, Rader, Bluestein, and dispatch as implemented;
+2. **reusable plans** — construction separated from steady-state complex/real execution;
+3. **production-library backends** — lifecycle-normalized external comparisons;
+4. **machine-level codelets** — one mathematical decomposition held fixed while state layout and ISA change.
 
-H3. Stockham’s regular autosort memory access will trade additional memory traffic/workspace for removal of explicit bit reversal; the crossover is architecture- and size-dependent.
+Do not combine results from these layers without stating the different timing semantics.
 
-H4. For prime sizes, Rader and Bluestein will exhibit measurable crossovers governed partly by convolution length and permutation/setup overhead.
+Specialized contracts:
 
-H5. Numerical error will vary by algorithm and signal family even when all implementations pass conventional round-trip tests.
+- [`PLANNING_REAL.md`](PLANNING_REAL.md) — reusable plans and real-input reduction;
+- [`VENDOR_BENCHMARKS.md`](VENDOR_BENCHMARKS.md) — external libraries;
+- [`SIMD_KERNELS.md`](SIMD_KERNELS.md) — scalar/AVX2/AVX-512 codelets and plan-time ISA selection.
 
-H6. For repeated power-of-two transforms, precomputing radix-2 permutation/twiddle state will materially reduce steady-state execution latency, and the one-time plan cost will amortize after a small finite number of transforms.
+## Standing hypotheses
 
-H7. For real-valued power-of-two input, an N/2-complex reduction with packed Hermitian output will materially outperform applying the already-planned N-point complex transform to data whose imaginary components are known to be zero.
+H1. Direct DFT will show quadratic scaling and rapidly lose to FFT families as N grows.
 
-These are hypotheses, not README conclusions. Results should be updated only from checked-in raw data.
+H2. Lower structural arithmetic count does not guarantee lower latency because allocation, recursion, locality, data movement, and code generation matter.
+
+H3. Stockham's regular access trades workspace/traffic against explicit permutation; its crossover is architecture dependent.
+
+H4. Rader and Bluestein exhibit prime-size crossovers governed by convolution length and setup/permutation effects.
+
+H5. Numerical error varies by algorithm and signal family even when round-trip tests pass.
+
+H6. Reusable radix-2 permutation/twiddle state materially reduces repeated execution latency and can amortize quickly.
+
+H7. Specialized real FFTs materially outperform treating known-real data as generic complex data in relevant size ranges.
+
+H8. SIMD codelets can materially close the gap to optimized production libraries without changing the mathematical FFT family.
+
+H9. Wider SIMD is **not** assumed faster: AVX2/AVX-512 preference may cross over with N, microarchitecture, compiler, thermal/frequency state, and implementation layout.
+
+H10. A plan-time empirical selector can adapt to hardware, but its own timing noise and construction cost may make it disagree with the best pooled explicit implementation. Such disagreements are results, not benchmark failures to erase.
+
+Hypotheses become conclusions only from checked-in raw evidence.
 
 ## Variables
 
 ### Independent variables
 
 - algorithm/decomposition;
-- execution semantics: setup-inclusive call, reusable plan construction, or execution-only reused plan;
-- data domain: complex or real input;
-- transform size N and factorization class;
-- input signal family;
-- compiler and version;
-- optimization flags (`FFT_NATIVE`, LTO, build type);
-- architecture/microarchitecture;
-- session/order;
-- optionally power mode, affinity, and thermal state.
+- implementation/codelet and explicit ISA;
+- planning/dispatch policy;
+- setup-inclusive call versus reusable execution;
+- complex versus real data;
+- N and factorization class;
+- signal family;
+- compiler/version and optimization flags;
+- architecture/microarchitecture and runtime capability set;
+- vendor runtime/build and planner policy;
+- session and randomized order;
+- optionally affinity, power mode, thermal state, alignment, and thread count.
 
 ### Response variables
 
-- ns/transform for every raw timing sample;
-- plan/setup latency;
-- setup break-even transform count;
-- median latency;
-- median absolute deviation (MAD);
-- p05/p95;
-- nonparametric 95% bootstrap CI for median;
-- pairwise speedup with bootstrap CI;
-- common-language probability of superiority (`P(faster)`), where applicable;
-- normalized forward/backward L1, L2, and Linf error;
-- forward→inverse max absolute error;
-- structural complex-operation and workspace models;
-- packed real-spectrum size and persistent-plan state where relevant.
+- every raw ns/transform observation;
+- setup/plan/tuning latency;
+- setup break-even count;
+- median, MAD, p05/p95;
+- bootstrap confidence intervals for medians and speedup ratios;
+- effect-size/probability-of-superiority metrics where useful;
+- forward/backward normalized L1/L2/L∞ error;
+- round-trip error;
+- structural operation/workspace models;
+- persistent plan/codelet storage;
+- selected policy/ISA for adaptive planners.
 
-## General algorithm timing procedure
+## General timing procedure
 
-For publication-quality comparisons among the original algorithm implementations, use `tools/run_experiment.py` rather than only `--benchmark-suite`.
+Publication-quality performance claims should satisfy the following unless a specialized protocol documents a justified exception:
 
-1. Build a release binary and record the exact commit/compiler/options.
-2. Select sizes **before** looking at results. Include powers of two, smooth composites, awkward composites, and primes.
-3. Run at least three independent sessions when making comparative claims.
-4. Randomize `(N, algorithm)` execution order within each session to reduce monotonic thermal/time drift.
+1. Pin the exact source commit and record compiler/options.
+2. Select the transform matrix before interpreting results.
+3. Use at least three independent sessions for comparative claims.
+4. Randomize competing mode order within samples and size/order across sessions where practical.
 5. Perform untimed warmups.
-6. Calibrate repetitions so each timing sample has sufficient duration.
-7. Retain every raw sample; never keep only the best run.
-8. Analyze medians and robust dispersion. Report confidence intervals and effect sizes, not only point estimates.
-9. Treat overlapping intervals as descriptive uncertainty, not a mechanical hypothesis-test rule.
-10. Re-run on materially different hardware before making architecture-general claims.
+6. Calibrate repeated operations so timer overhead is small relative to sample duration.
+7. Retain **every** raw sample, not just best runs or aggregates.
+8. Report medians and robust dispersion plus uncertainty/effect size.
+9. Do not use interval overlap as a mechanical significance test; compute the relevant pairwise statistic directly.
+10. Re-run on materially different physical hardware before architecture-general claims.
 
-Example:
+## Original algorithm calls
+
+The historical algorithm APIs may allocate or generate reusable state on every call. Their benchmark is therefore end-to-end latency **for those functions as implemented**.
+
+That metric is valid for the API but must not be silently compared to reused-plan execution from another implementation.
 
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DFFT_NATIVE=ON
-cmake --build build -j
 python3 tools/run_experiment.py --binary build/fft --sessions 5 --samples 51
-python3 tools/analyze.py results/run-*/timings.csv > analysis.md
+python3 tools/analyze.py results/run-*/timings.csv
 ```
 
-## Timing semantics: pedagogical algorithm calls
+## Reusable plan timing
 
-The original transform functions return vectors and several pedagogical algorithms allocate scratch storage on each call. Their benchmark therefore measures **end-to-end call latency including implementation-specific allocation/setup performed by that function**.
+For planned execution:
 
-This metric remains useful for comparing those APIs as implemented, but it must not be silently compared with an execution-only production FFT plan.
-
-## Timing semantics: reusable plans
-
-The v3 plan experiment resolves that ambiguity for reusable power-of-two radix-2 transforms. Its full contract and real-input derivation are in [`PLANNING_REAL.md`](PLANNING_REAL.md).
-
-`tools/run_plan_experiment.py` / `fft-plan` distinguish five modes:
-
-- complex plan construction;
-- real plan construction;
-- legacy radix-2 complex execution;
-- planned radix-2 complex execution;
-- planned real-input execution.
-
-For the two planned execution modes:
-
-- plans already exist before the timed interval;
-- required output/scratch buffers already exist;
-- execution performs no dynamic allocation;
-- reusable trigonometric/twiddle setup is outside the timed interval;
-- forward+inverse pairs are used so buffers can be reused without copying fresh input into every timed transform;
-- pair elapsed time is divided by two;
-- benchmark-mode order is randomized independently inside each sample;
-- formal size order is randomized independently by session.
-
-Setup is not discarded: it is measured independently and used to compute break-even transform counts.
-
-Example:
+- plans exist before execution timing;
+- output/scratch buffers already exist;
+- reusable trigonometric/twiddle setup is outside execution timing;
+- forward+inverse pairs permit buffer reuse without timing a fresh input copy;
+- elapsed pair time is divided by two;
+- setup is measured separately and used in amortization.
 
 ```bash
 python3 tools/run_plan_experiment.py \
-  --binary build/fft-plan \
-  --out results/run-plan \
+  --binary build/fft-plan --out results/run-plan \
   --sizes 64,256,1024,4096,16384,65536 \
-  --sessions 5 \
-  --samples 51 \
-  --target-ms 5 \
+  --sessions 5 --samples 51 --target-ms 5 \
   --source-commit "$(git rev-parse HEAD)"
-
-python3 tools/analyze_plan.py results/run-plan/timings.csv
 ```
 
-The analyzer accepts a single CSV, a gzip-compressed CSV, or a directory of CSV/CSV.GZ shards.
+## Production-library timing
 
-## Rules for future external-library comparisons
+External comparisons must normalize, record, or explicitly identify remaining differences in:
 
-A production-library benchmark must normalize workload semantics before reporting rankings. Record separately whenever the API permits:
-
-1. plan/setup construction time;
-2. persistent plan memory;
-3. caller-provided/workspace memory;
-4. execution time using an already-created plan and already-allocated buffers;
-5. destruction cost if the research question concerns one-shot transforms.
-
-Also control and report:
-
-- in-place vs out-of-place execution;
-- real vs complex input;
-- forward/inverse normalization convention;
-- planning flags or effort levels;
-- thread count;
+- setup/planning policy and cache/wisdom state;
+- persistent plan and workspace ownership;
+- in-place/out-of-place semantics;
+- complex/real representation;
+- inverse normalization;
 - precision;
-- alignment requirements;
-- batch count;
-- transform size/factorization;
-- cold-plan latency vs repeated steady-state throughput.
+- alignment/allocator requirements;
+- threads and batch count;
+- library identity/version/build;
+- cold versus reused execution.
 
-A comparison that charges one implementation for planning on every transform while another reuses a plan is not an algorithm/library speed comparison unless that asymmetry exactly matches the intended application workload.
+A faster persistent kernel can have worse total workload cost if planning is expensive. Both quantities should be reported when material.
+
+## SIMD/codelet timing
+
+ISA studies must distinguish **capability**, **explicit implementation performance**, and **adaptive selection**.
+
+For the v5 radix-2 codelet study:
+
+- scalar, AVX2/FMA, and AVX-512/FMA share the same swap-list and stage-contiguous twiddle plan structure;
+- the mathematical radix-2 decomposition is held fixed;
+- explicit-width modes remain available even when `Auto` is tested;
+- the portable build does not globally require optional ISA support;
+- runtime capability checks gate optional instruction paths;
+- unsupported explicit ISA requests are rejected;
+- FMA paths are checked numerically with a justified tolerance rather than bitwise equality;
+- plan/tuning cost is measured separately;
+- auto-selected ISA is retained per session;
+- explicit kernels and auto are timed in the same randomized matrix as the v3 plan and FFTW when available.
+
+Formal example:
+
+```bash
+python3 tools/run_kernel_experiment.py \
+  --binary build/fft-kernel \
+  --out results/run-kernel \
+  --sizes 64,256,1024,4096,16384,65536 \
+  --sessions 3 --samples 31 --setup-samples 1 \
+  --target-ms 2 \
+  --source-commit "$(git rev-parse HEAD)"
+
+python3 tools/analyze_kernel.py results/run-kernel/raw \
+  --bootstrap 5000 --seed 20260812
+```
+
+A wider vector implementation is called faster only from observed data with a stated uncertainty interval. Do not infer a universal ISA crossover from one machine.
+
+An adaptive selector should be evaluated against the explicit paths it can choose. If it disagrees with the pooled explicit winner, preserve and report the disagreement. Do not tune the benchmark or hard-code the observed crossover solely to make the adaptive policy appear correct.
 
 ## Accuracy protocol
 
-`--accuracy-suite` uses five deterministic input families:
+The general accuracy suite uses five deterministic inputs:
 
 - pseudorandom complex values;
-- multi-tone signals plus noise;
+- multi-tone plus noise;
 - impulse;
 - alternating/cancellation-heavy values;
-- very high dynamic range values.
+- high-dynamic-range values.
 
-For each supported `(algorithm, N, signal)` tuple, compute:
+For each supported `(algorithm, N, signal)` tuple:
 
-1. long-double direct DFT reference;
-2. normalized forward L1/L2/Linf error;
-3. long-double inverse of the algorithm output to estimate backward error;
-4. algorithmic forward→inverse round-trip max error.
+1. compute a long-double direct DFT reference;
+2. report normalized forward L1/L2/L∞ error;
+3. use a long-double inverse to estimate backward error;
+4. report algorithmic forward→inverse round-trip max error.
 
-The same generated signal is used for all algorithms at a given N and signal family.
-
-The real-input plan has an additional structural correctness check: every returned half-spectrum value is compared with the corresponding nonredundant bin of a full complex FFT of the same real sequence, followed by an inverse round trip.
+Reusable real plans additionally verify each packed half-spectrum bin against the corresponding full complex FFT bin. SIMD kernels are cross-checked against the established radix-2 result and round-trip behavior; FMA-induced rounding differences are permitted within the declared tolerance.
 
 ## Threats to validity
 
 ### Internal
 
 - OS scheduling and virtualization noise;
-- frequency scaling/turbo/thermal throttling;
-- benchmark process migration;
-- calibration differences between very fast and very slow algorithms;
-- allocation and page-fault effects;
-- cache state and mode-order effects;
-- bootstrap samples are not proof of independence.
+- frequency/turbo/thermal state;
+- process migration and affinity;
+- cache state and mode order;
+- calibration differences;
+- page faults/allocation outside or inside the intended timing region;
+- adaptive tuner noise;
+- bootstrap samples do not prove independence.
 
 ### Construct
 
-- `5 N log2 N / time` is a radix-2-equivalent throughput scale, **not** measured FLOPs;
-- complex-operation models do not equal instruction counts;
+- `5 N log2 N / time` is a radix-2-equivalent scale, not measured FLOPs;
+- complex structural counts are not machine instruction counts;
 - long double is not arbitrary precision;
-- setup-inclusive pedagogical call latency is not equivalent to reused-plan execution latency;
-- complex-input timing is not a faithful proxy for real-input workloads that can exploit Hermitian symmetry;
-- break-even counts depend on both the specific plan constructor and the measured execution delta.
+- setup-inclusive calls and reused-plan execution are different workloads;
+- complex timing is not a proxy for a specialized real FFT;
+- ISA availability is not throughput evidence;
+- FMA changes floating-point rounding semantics without changing the intended DFT;
+- a different plan layout may change memory footprint as well as execution speed;
+- an adaptive planner must be charged for tuning.
 
 ### External
 
-- one CPU/compiler cannot justify universal algorithm rankings;
-- GPU, SIMD-specialized, multithreaded, multidimensional, batched, and different-precision transforms can have qualitatively different winners;
-- a virtualized/containerized development host is appropriate for validating the pipeline and local hypotheses, not for universal physical-hardware claims.
+- one virtualized CPU/compiler cannot justify universal algorithm or ISA rankings;
+- physical machines may have different AVX-512 frequency behavior, cache hierarchy, memory system, compiler output, and scheduler state;
+- Arm SIMD, GPUs, threads, batching, multidimensional transforms, and different precisions can have qualitatively different winners.
 
 ## Publication rule
 
-A claim belongs in `results/SUMMARY.md` only when all of the following are available:
+A headline claim belongs in `results/SUMMARY.md` only when the repository contains:
 
-- raw data;
-- environment metadata;
-- exact source commit;
-- command/protocol;
+- all raw data;
+- environment/runtime metadata;
+- exact source commit and relevant source blobs;
+- build/compiler provenance;
+- command/protocol and timing semantics;
 - sample/session counts;
 - uncertainty/effect-size analysis;
-- a scope statement saying which hardware/software configuration the claim applies to.
+- an explicit scope statement.
 
-For reusable-plan or external-library claims, the publication record must additionally state whether planning, allocation, workspace preparation, data copying, and normalization are inside or outside the timed region.
+Reusable/vendor claims must state planning, allocation/workspace, data-copy, normalization, and threading semantics. SIMD claims must additionally record capability requirements, explicit-width controls, adaptive selections if any, and persistent-state/setup tradeoffs.
