@@ -16,6 +16,8 @@ This bibliography is intentionally biased toward original papers and project-aut
 12. FFTW project, **FFTW 3.3.11 manual — Planner Flags**, `https://www.fftw.org/fftw3_doc/Planner-Flags.html`. Defines `FFTW_ESTIMATE`, `FFTW_MEASURE`, `PATIENT`, `EXHAUSTIVE`, wisdom behavior, and planner tradeoffs.
 13. FFTW project, **FFTW 3.3.11 manual — One-Dimensional DFTs of Real Data**, `https://www.fftw.org/fftw3_doc/One_002dDimensional-DFTs-of-Real-Data.html`. Documents the `N/2+1` nonredundant real spectrum and r2c/c2r layout.
 14. FFTW project, **FFTW 3.3.11 manual — What FFTW Really Computes**, `https://www.fftw.org/fftw3_doc/What-FFTW-Really-Computes.html`. Documents FFTW's unnormalized DFT convention.
+15. Intel, **Intel Intrinsics Guide**, `https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html`. Primary reference for AVX2, AVX-512, FMA, lane semantics, and CPUID feature requirements used by the x86 codelets.
+16. AMD, **Software Optimization Guide for AMD Zen 4 Processors**, document 57647, `https://www.amd.com/content/dam/amd/en/documents/processor-tech-docs/software-optimization-guides/57647.zip`. Architecture-specific optimization reference for the CPU family represented by the current virtualized AMD baseline.
 
 ## Why these matter here
 
@@ -24,4 +26,5 @@ This bibliography is intentionally biased toward original papers and project-aut
 - Split-radix is important for arithmetic-count research; modified split-radix demonstrates that lower arithmetic count remains an active theoretical question rather than a settled proxy for wall-clock speed.
 - FFTW is the canonical example of architecture-adaptive FFT engineering and supplies a mature precedent for separating setup/planning, execution speed, data format, and numerical accuracy.
 - The FFTW manual is treated as the source of truth for planner flags, real-data representation, and normalization in the v4 vendor benchmark.
+- Intel's instruction/intrinsic documentation is the source of truth for the AVX2/AVX-512/FMA operations used by the v5 codelets; AMD's optimization guide supplies the architecture-specific optimization context for the recorded AMD environment.
 - Recent arithmetic-complexity work is tracked so the repository does not incorrectly imply that textbook split-radix is the theoretical endpoint.
