@@ -1,0 +1,28 @@
+cmake_minimum_required(VERSION 3.20)
+project(fft VERSION 1.0.0 LANGUAGES CXX)
+
+option(FFT_NATIVE "Enable -march=native or MSVC equivalent optimizations" OFF)
+option(FFT_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+
+add_executable(fft fft.cpp)
+target_compile_features(fft PRIVATE cxx_std_23)
+set_target_properties(fft PROPERTIES CXX_EXTENSIONS OFF)
+
+if(MSVC)
+    target_compile_options(fft PRIVATE /W4 /permissive-)
+    if(FFT_NATIVE)
+        target_compile_options(fft PRIVATE /arch:AVX2)
+    endif()
+else()
+    target_compile_options(fft PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wshadow)
+    if(FFT_NATIVE)
+        target_compile_options(fft PRIVATE -march=native)
+    endif()
+    if(FFT_SANITIZERS AND CMAKE_BUILD_TYPE MATCHES "Debug|RelWithDebInfo")
+        target_compile_options(fft PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
+        target_link_options(fft PRIVATE -fsanitize=address,undefined)
+    endif()
+endif()
+
+enable_testing()
+add_test(NAME fft_self_test COMMAND fft --self-test)
