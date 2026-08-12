@@ -165,8 +165,12 @@ ArbitraryPlan::Storage ArbitraryPlan::make_storage(std::size_t n, ArbitraryPlanP
         return Storage{std::in_place_type<Radix2Plan>, n};
     }
     if (n >= 3 && is_prime(n)) {
-        algorithm = ArbitraryPlanAlgorithm::Rader;
-        return Storage{std::in_place_type<RaderPlan>, n};
+        if (rader_workspace(n) < bluestein_workspace(n)) {
+            algorithm = ArbitraryPlanAlgorithm::Rader;
+            return Storage{std::in_place_type<RaderPlan>, n};
+        }
+        algorithm = ArbitraryPlanAlgorithm::Bluestein;
+        return Storage{std::in_place_type<BluesteinPlan>, n};
     }
     algorithm = ArbitraryPlanAlgorithm::Bluestein;
     return Storage{std::in_place_type<BluesteinPlan>, n};
@@ -255,6 +259,19 @@ void arbitrary_plan_tests() {
                 req(std::abs(back[i] - x[i]) < 3e-10 * (1.0 + std::abs(x[i])), "Rader roundtrip");
         }
     }
+
+    for (std::size_t n : {17u, 257u}) {
+        ArbitraryPlan plan(n);
+        req(plan.algorithm() == ArbitraryPlanAlgorithm::Rader, "Auto uses shorter direct Rader convolution");
+    }
+    for (std::size_t n : {31u, 61u, 127u, 509u, 1009u, 4093u}) {
+        ArbitraryPlan plan(n);
+        req(plan.algorithm() == ArbitraryPlanAlgorithm::Bluestein, "Auto prefers Bluestein when convolution lengths tie");
+    }
+    ArbitraryPlan power2_plan(64);
+    req(power2_plan.algorithm() == ArbitraryPlanAlgorithm::Radix2, "Auto uses radix2 for powers of two");
+    ArbitraryPlan composite_plan(255);
+    req(composite_plan.algorithm() == ArbitraryPlanAlgorithm::Bluestein, "Auto uses Bluestein for composite arbitrary length");
 
     bool threw = false;
     try { RaderPlan bad(15); } catch (const std::invalid_argument&) { threw = true; }
