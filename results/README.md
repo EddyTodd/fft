@@ -4,49 +4,50 @@ This directory keeps **raw measurements and their provenance**, not just screens
 
 ## Datasets
 
-### `pr3-planning-real-baseline/`
+### `pr4-fftw-baseline/`
 
-The first formal dataset that separates reusable FFT setup from steady-state execution and studies a specialized real-input representation. It contains:
+The first controlled external production-library comparison. It compares fftlab's reusable complex/real plans with FFTW 3.3.10 under matched setup/execution semantics and two FFTW planner policies (`ESTIMATE`, `MEASURE`).
 
-- `metadata.json` — exact benchmarked source commit, raw-data commit, environment, compiler/build, protocol, hashes, and validation;
-- `raw/timings-session*.csv.gz` — every raw timing observation for three randomized sessions;
-- `ANALYSIS.md` — bootstrap speedup intervals, setup medians, and plan-amortization estimates;
-- `README.md` — benchmark-mode definitions and interpretation guidance.
+It contains:
 
-The dataset contains **2,790 timing observations** across 6 power-of-two sizes and five modes: complex-plan construction, real-plan construction, legacy complex execution, planned complex execution, and planned real execution. Setup is measured separately rather than folded into repeated execution latency.
+- `metadata.json` — exact source commit/blobs, binary hash, FFTW runtime, compiler/build, protocol, and raw-file hashes;
+- `raw/timings-session*.csv.gz` — every observation from three independently randomized sessions;
+- `ANALYSIS.md` — execution speedups, bootstrap confidence intervals, setup economics, effect sizes, and amortized winners;
+- `README.md` — the benchmark contract and interpretation scope.
 
-Reproduce its analysis directly from the compressed checked-in data:
+The corpus contains **3,456 observations** across 6 sizes. Planning is separate from persistent-plan execution, FFTW inverse normalization is included in its execution timing, and specialized real FFTs are compared with specialized real FFTs.
 
 ```bash
-python3 tools/analyze_plan.py results/pr3-planning-real-baseline/raw \
-  --seed 20260812
+python3 tools/analyze_vendor.py results/pr4-fftw-baseline/raw --seed 20260812
+```
+
+### `pr3-planning-real-baseline/`
+
+The first formal dataset separating reusable FFT setup from steady-state execution and studying a specialized real-input representation. It contains **2,790 timing observations** across six power-of-two sizes and five modes.
+
+```bash
+python3 tools/analyze_plan.py results/pr3-planning-real-baseline/raw --seed 20260812
 ```
 
 ### `pr2-research-baseline/`
 
-The first formal research dataset for the expanded algorithm set. It contains:
-
-- `metadata.json` — exact source commit, environment, and protocol;
-- `raw/timings-N*-session*.csv` — every raw timing sample with session and randomized execution order;
-- `complexity.csv` — structural operation/workspace models for measured algorithm/size pairs;
-- `raw/accuracy-N*.csv` — forward/backward normed error across deterministic signal families;
-- `ANALYSIS.md` — timing rankings, bootstrap confidence intervals, robust dispersion, and effect sizes;
-- `ACCURACY_ANALYSIS.md` — accuracy ranking by worst forward L2 error across signal families.
+The first formal expanded-algorithm dataset: raw randomized timing samples, structural complexity models, multi-family forward/backward numerical error, bootstrap uncertainty, and effect-size analysis.
 
 ### `baseline-linux-amd-epyc-gcc14.csv`
 
-The original v1 development baseline. It predates the formal randomized multi-session protocol and is retained for historical continuity.
+The v1 development baseline, retained for historical continuity.
 
 ## Interpretation rules
 
 1. Do not call an implementation universally “fastest” from these files.
 2. Distinguish structural operation counts from measured latency.
 3. Distinguish one-time planning/setup from reusable execution cost.
-4. Do not substitute complex-input FFT measurements for real-input workloads when Hermitian symmetry can be exploited.
-5. Preserve raw samples and metadata when adding a result.
-6. Treat tiny differences with uncertainty intervals spanning parity as statistically unresolved.
-7. Update `SUMMARY.md` only with claims supported by checked-in data.
+4. Do not substitute complex-input FFT measurements for real-input workloads.
+5. Production-library comparisons must normalize transform convention, inverse scaling, planner policy, allocation/workspace semantics, and thread count.
+6. Preserve every raw sample and exact source/runtime provenance.
+7. Treat uncertainty intervals spanning parity as statistically unresolved rather than forcing a winner.
+8. Update `SUMMARY.md` only with claims supported by checked-in data.
 
-The current datasets are from a containerized/virtualized environment, so absolute timings are **pipeline/research-development evidence**, not a substitute for results from named physical machines with controlled power, affinity, and thermal state.
+The current formal baselines are from a containerized/virtualized environment. They support implementation-specific and methodology claims, not universal hardware rankings.
 
-The general protocol is in [`../docs/EXPERIMENTS.md`](../docs/EXPERIMENTS.md); setup/execution and real-input semantics are specified in [`../docs/PLANNING_REAL.md`](../docs/PLANNING_REAL.md).
+Protocols: [`../docs/EXPERIMENTS.md`](../docs/EXPERIMENTS.md), [`../docs/PLANNING_REAL.md`](../docs/PLANNING_REAL.md), and [`../docs/VENDOR_BENCHMARKS.md`](../docs/VENDOR_BENCHMARKS.md).
