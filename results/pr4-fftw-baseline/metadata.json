@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "timestamp_utc": "20260812T084042Z",
+  "source_commit": "781ad3deca0d49afaa9010fe01077f0dd0d11fa4",
+  "binary": "./fft-vendor-formal",
+  "platform": "Linux-6.18.35-x86_64-with-glibc2.41",
+  "machine": "x86_64",
+  "cpu": "AMD EPYC 9V74 80-Core Processor",
+  "logical_cpus": 5,
+  "fftw_library": "libfftw3.so.3",
+  "fftw_version": "fftw-3.3.10-sse2-avx",
+  "sizes": [64, 256, 1024, 4096, 16384, 65536],
+  "sessions": 3,
+  "execution_samples_per_mode_per_session": 31,
+  "cold_setup_samples_per_mode_per_session": 1,
+  "warmups": 5,
+  "target_ms": 2.0,
+  "randomization_seed": 20260812,
+  "semantics": "forward+normalized-inverse pair divided by two; FFTW inverse scaling included; caller buffers allocated outside setup/execution timing; FFTW cold setup forgets wisdom before each forward+inverse plan pair",
+  "source_vendor_blob": "a61bffba4288f24d62ee2d76c23041b059de78d4",
+  "source_cmake_blob": "252c4db3aaa1474003bb6384de7bc7ea2c7d13a7",
+  "compiler": "g++ (Debian 14.2.0-19) 14.2.0",
+  "compile_flags": "-O3 -DNDEBUG -march=native -std=c++23",
+  "fft_native": "ON-equivalent",
+  "lto": false,
+  "threads": 1,
+  "binary_sha256": "43deeeae093e0afd4d69ed6f64c23aee9d058e2b2bfddf6ef8ed4e0f7f1be8d7",
+  "raw_files": [
+    {"name": "timings-session0.csv.gz", "sha256": "b644736691e93e66d5382f53aa988dc4d4d767de3962c431fd608dfdc8c46e11", "git_blob": "3e4461e7344ca212c72191b40893d43925c992a8"},
+    {"name": "timings-session1.csv.gz", "sha256": "5291be99955adae6c7bd3371870b0d5512aebadd622d776e4737a6e85c32fa6e", "git_blob": "05912df71a9d88874599629c8b431986b919d404"},
+    {"name": "timings-session2.csv.gz", "sha256": "f2ac1160fe58c3b4ac6e9d88d9bc9327ad98ddc8917b74e274395cf7850c0bdf", "git_blob": "53f1baa9a6cc7c24e513cbaddebc3d53881bb902"}
+  ]
+}
