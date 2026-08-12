@@ -1,68 +1,88 @@
 # Research results summary
 
+## v5 — SIMD radix-2 codelet baseline
+
+The v5 milestone asks how much of the gap between a readable reusable radix-2 plan and FFTW can be explained by **plan-state layout and explicit SIMD codelets while the mathematical decomposition stays fixed**.
+
+The checked-in `pr5-simd-kernel-baseline/` corpus contains **4,032 raw observations** from 3 randomized sessions at N=64, 256, 1024, 4096, 16384, and 65536. The exact source commit, source blobs, formal binary hash, compiler/runtime, raw hashes, and benchmark semantics are recorded in metadata.
+
+### Execution
+
+| N | v3 plan | Scalar codelet | AVX2/FMA | AVX-512/FMA | FFTW MEASURE | Best SIMD / v3 |
+|---:|---:|---:|---:|---:|---:|---:|
+| 64 | 313.6 ns | 294.4 ns | **179.4 ns** | 215.0 ns | 82.1 ns | **1.747×** |
+| 256 | 1.60 µs | 1.53 µs | **758.1 ns** | 936.4 ns | 367.5 ns | **2.104×** |
+| 1024 | 7.62 µs | 7.30 µs | **3.75 µs** | 4.41 µs | 1.70 µs | **2.035×** |
+| 4096 | 41.13 µs | 38.22 µs | 24.46 µs | **21.07 µs** | 10.69 µs | **1.952×** |
+| 16384 | 228.53 µs | 202.27 µs | 142.49 µs | **121.85 µs** | 51.76 µs | **1.876×** |
+| 65536 | 1.227 ms | 993.61 µs | 733.51 µs | **642.54 µs** | 292.70 µs | **1.909×** |
+
+The best explicit SIMD path is **1.747–2.104× faster** than the merged v3 plan and closes roughly **57.9–68.2%** of the latency gap from that plan to FFTW `MEASURE`. FFTW still remains approximately **1.97–2.35× faster** than the best local SIMD codelet across the matrix.
+
+### Wider vectors are not universally faster
+
+The recorded data have a clear size-dependent crossover:
+
+- AVX2 is faster at N=64, 256, and 1024;
+- AVX-512 is faster at N=4096, 16384, and 65536;
+- all six AVX2-versus-AVX-512 bootstrap 95% intervals exclude parity.
+
+This is an implementation/environment result rather than a universal x86 rule. It demonstrates why ISA availability or vector width alone is not a defensible dispatch policy.
+
+### Layout matters before vectorization
+
+The scalar codelet uses the same mathematical radix-2 decomposition but changes reusable plan state:
+
+- only actual bit-reversal swap pairs are stored;
+- each stage's twiddles are stored contiguously;
+- the execution loop therefore removes a per-index permutation branch and strided twiddle lookup.
+
+The scalar path is already faster than the v3 plan at the tested sizes, though the major gain comes from explicit SIMD/FMA.
+
+### Planning economics
+
+The SIMD-friendly plan stores more twiddle state than the v3 plan. Its explicit setup cost remains small enough to amortize quickly in this baseline:
+
+- about **20 transforms** at N=64;
+- about **9.6** at N=256;
+- about **2.4** at N=1024;
+- about **1.35** at N=4096;
+- below **one transform** at N=16384 and 65536 according to the recorded median setup/execution deltas.
+
+The experimental `Auto` selector is different. It times scalar/AVX2/AVX-512 candidates during construction and costs roughly **26–99 ms** in this experiment. Its choices are not perfectly stable: it consistently selects AVX2 at small sizes and AVX-512 at N=65536, but at intermediate sizes its session-level choice can vary and can disagree with the pooled explicit-kernel winner.
+
+That mismatch is preserved as evidence, not hidden. `Auto` is a research mechanism for studying adaptive planning; it is not presented as a production-quality universal dispatch policy.
+
+### Remaining FFTW gap
+
+One vectorized radix-2 codelet closes most of the original local-to-FFTW latency difference, but not all of it. The remaining ~2× gap points toward additional engineering dimensions including:
+
+- generated/specialized codelet families;
+- decomposition and schedule selection;
+- permutation strategy;
+- cache blocking and large-transform algorithms;
+- alignment/data-layout choices;
+- real-input vectorization;
+- persisted planning wisdom;
+- other architecture-specific optimization.
+
+See `pr5-simd-kernel-baseline/ANALYSIS.md` and `docs/SIMD_KERNELS.md`.
+
 ## v4 — FFTW production-library baseline
 
-The v4 milestone asks a different question from earlier algorithm races: **which FFT strategy is cheapest for a workload once planning and execution are both modeled?**
+The v4 corpus contains **3,456 raw observations** and established that persistent FFTW execution is much faster than the v3 fftlab plans while planner economics can reverse the end-to-end winner for short workloads.
 
-The checked-in `pr4-fftw-baseline/` corpus contains **3,456 raw observations** from 3 randomized sessions at N=64, 256, 1024, 4096, 16384, and 65536. It compares fftlab reusable complex/real plans with FFTW 3.3.10 `ESTIMATE` and `MEASURE`. Source/runtime/build hashes and exact benchmark semantics are recorded in metadata.
+Across its formal matrix, FFTW `MEASURE` was approximately **3.77–4.68× faster** than fftlab for planned complex execution and **4.16–6.59× faster** for planned real execution. Cold `MEASURE` planning cost tens of milliseconds to roughly two seconds and required approximately **19,668 to 2,126,344 transforms** to amortize versus `ESTIMATE`, depending on size and workload.
 
-### Steady-state execution
-
-| N | fftlab complex | FFTW ESTIMATE | FFTW MEASURE | fftlab real | FFTW ESTIMATE real | FFTW MEASURE real |
-|---:|---:|---:|---:|---:|---:|---:|
-| 64 | 313.7 ns | 137.3 ns | 81.6 ns | 305.5 ns | 85.6 ns | 66.8 ns |
-| 256 | 1.58 µs | 468.3 ns | 370.8 ns | 1.35 µs | 323.6 ns | 204.5 ns |
-| 1024 | 7.77 µs | 2.13 µs | 1.66 µs | 6.03 µs | 1.03 µs | 918.6 ns |
-| 4096 | 40.55 µs | 15.01 µs | 10.77 µs | 27.35 µs | 5.13 µs | 4.72 µs |
-| 16384 | 230.84 µs | 108.18 µs | 51.97 µs | 138.47 µs | 41.48 µs | 25.11 µs |
-| 65536 | 1.20 ms | 354.77 µs | 287.35 µs | 711.37 µs | 211.74 µs | 171.15 µs |
-
-Across this matrix, FFTW `MEASURE` is approximately **3.77–4.68× faster** than fftlab for planned complex execution and **4.16–6.59× faster** for planned real execution. The relevant bootstrap 95% intervals remain well above parity.
-
-### Planning changes the answer
-
-Cold planning is not free. In the recorded run:
-
-- FFTW `ESTIMATE` complex setup ranges from roughly 92 µs to 738 µs;
-- FFTW `MEASURE` complex setup ranges from about 49 ms to 1.87 s;
-- FFTW `MEASURE` real setup ranges from about 21 ms to 2.05 s.
-
-As a result, the faster `MEASURE` execution path may require **19,668 to 2,126,344 repeated transforms** to repay its additional planning cost relative to `ESTIMATE`, depending on transform size and real/complex workload.
-
-The same effect appears when comparing fftlab with FFTW `ESTIMATE` at small sizes. For complex transforms, the recorded break-even is approximately:
-
-- N=64: **431 transforms**;
-- N=256: **131 transforms**;
-- N=1024: **14 transforms**;
-- N=4096: **1.4 transforms**;
-- N≥16384: FFTW `ESTIMATE` is already cheaper to set up and faster to execute in this run.
-
-Therefore a one-shot or short-run benchmark can have a different winner from a throughput benchmark. `FFTW_MEASURE` being the fastest execution kernel does not imply it minimizes end-to-end workload cost.
-
-### Methodological conclusion
-
-A defensible production-library comparison must specify at least:
-
-- transform size and real/complex representation;
-- planning policy;
-- setup reuse count;
-- normalization convention;
-- in-place/out-of-place and allocation semantics;
-- alignment/workspace rules;
-- precision and thread count;
-- exact library build and hardware.
-
-See `pr4-fftw-baseline/ANALYSIS.md` and `docs/VENDOR_BENCHMARKS.md`.
+The methodological conclusion was that steady-state execution speed and total workload cost are separate questions.
 
 ## v3 — reusable planning and real-input specialization
 
 The v3 corpus contains **2,790 raw observations**. It established that the same radix-2 decomposition becomes **1.295–1.593× faster** when reusable permutation/twiddle setup is removed from steady-state execution, with plan construction amortizing after roughly **1.75–3.95 transforms**. The specialized real path reaches roughly **1.74–1.75×** the planned complex throughput at the larger tested sizes.
 
-The key conclusion was methodological: setup, complex execution, and real execution are separate workloads.
-
 ## v2 — algorithm families, structural complexity, and accuracy
 
-The v2 research baseline established a broader algorithm taxonomy and independent accuracy studies. Selected results include:
+Selected results from the formal expanded-algorithm study include:
 
 - Rader about **1.29× faster than Bluestein** at N=509 and N=1009 in the recorded environment;
 - iterative radix-2 about **1089× faster than direct DFT** at N=1024;
@@ -73,6 +93,6 @@ That milestone demonstrated that mathematical operation count, numerical behavio
 
 ## Evidence scope
 
-All current formal baseline numbers come from virtualized/containerized development environments. They support implementation- and methodology-specific conclusions, not universal hardware rankings. The next external-validity step is repetition on named physical x86-64 and Arm machines with additional production backends and controlled threading/alignment.
+All current formal baseline numbers come from virtualized/containerized development environments. They support implementation- and methodology-specific conclusions, not universal hardware rankings. Physical x86-64 and Arm runs with controlled power/affinity/thermal state are required before making architecture-general crossover claims.
 
 The v1 baseline remains under `baseline-linux-amd-epyc-gcc14.csv` for historical continuity.
