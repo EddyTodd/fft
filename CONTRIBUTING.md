@@ -29,9 +29,21 @@ Reusable plans and external-library backends must make lifecycle semantics expli
 
 Do not compare setup-inclusive latency from one implementation with reused-plan execution from another and label the result a general speed ranking. If both workloads are important, measure both separately.
 
+External production-library backends must additionally:
+
+- remain optional to the from-first-principles core unless there is a documented reason otherwise;
+- record the exact runtime/library identity and version;
+- pass deterministic numerical cross-checks before benchmark results are accepted;
+- record planner flags/policy and whether caches or wisdom were warm or cold;
+- state how normalization differences are made equivalent;
+- retain exact source, binary/build, and raw-data provenance;
+- document alignment, allocator, and threading differences that remain construct-validity threats.
+
+The current production-library contract is [`docs/VENDOR_BENCHMARKS.md`](docs/VENDOR_BENCHMARKS.md).
+
 ## Benchmark changes
 
-Do not optimize a benchmark to produce a preferred ranking. Preserve raw measurements, report the exact environment, and distinguish setup/planning from execution. Any change that alters timing semantics must update `docs/EXPERIMENTS.md`, relevant specialized methodology (currently `docs/PLANNING_REAL.md`), and result metadata.
+Do not optimize a benchmark to produce a preferred ranking. Preserve raw measurements, report the exact environment, and distinguish setup/planning from execution. Any change that alters timing semantics must update `docs/EXPERIMENTS.md`, the applicable specialized methodology (`docs/PLANNING_REAL.md` and/or `docs/VENDOR_BENCHMARKS.md`), and result metadata.
 
 For real-input studies, do not silently benchmark an N-point complex transform with zero imaginary input when the competing API exploits Hermitian symmetry. Treat complex and real transforms as distinct workloads.
 
@@ -48,6 +60,8 @@ Avoid:
 For planning claims, state both setup cost and the timed execution semantics. For example:
 
 > With a reused N=4096 radix-2 plan, execution was 1.50x faster than the setup-inclusive legacy path; median plan construction amortized after 1.8 transforms in this environment.
+
+For vendor comparisons, report both steady-state execution and setup/amortization when planner costs differ materially. A faster execution kernel is not automatically a cheaper workload for one-shot or short-run use.
 
 ## Validation
 
@@ -67,4 +81,11 @@ Changes touching the plan layer should also run:
 
 ```bash
 ./build/fft-plan --self-test
+```
+
+Changes touching a vendor adapter should run that adapter's deterministic self-test on every available supported compiler/runtime configuration before publishing measurements. For FFTW:
+
+```bash
+./build/fft-vendor --info
+./build/fft-vendor --self-test
 ```
