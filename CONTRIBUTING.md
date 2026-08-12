@@ -29,15 +29,34 @@ Reusable plans and external-library backends must make lifecycle semantics expli
 
 Do not compare setup-inclusive latency from one implementation with reused-plan execution from another and label the result a general speed ranking.
 
-External production-library backends must additionally:
+## Arbitrary-length and prime plans
 
-- remain optional to the from-first-principles core unless there is a documented reason otherwise;
+Changes to Bluestein, Rader, or a general arbitrary-length planner must make the **convolution reduction itself auditable**. Document:
+
+- the convolution length chosen by each reduction;
+- whether the convolution is direct cyclic or zero-padded linear-and-folded;
+- precomputed chirp/kernel/permutation state;
+- persistent memory and caller scratch requirements;
+- setup and execution separately;
+- explicit algorithm controls even when an automatic policy exists.
+
+A prime dispatcher must not be justified only by one observed size threshold. Prefer structural rules that can be falsified across environments. If benchmark evidence changes a prior dispatcher, preserve the earlier evidence and explain why the semantics or implementation layer changed the conclusion.
+
+When comparing Rader and Bluestein, setup-inclusive legacy calls may be used to quantify API/planning benefit, but **reusable algorithm ranking must use planned-vs-planned execution**.
+
+See [`docs/ARBITRARY_PLANS.md`](docs/ARBITRARY_PLANS.md).
+
+## External production-library backends
+
+External backends must additionally:
+
+- remain optional to the from-first-principles core unless documented otherwise;
 - record exact runtime/library identity and version;
 - pass deterministic numerical cross-checks before benchmark results are accepted;
 - record planner flags/policy and cache/wisdom state;
 - state how normalization differences are made equivalent;
 - retain exact source, binary/build, and raw-data provenance;
-- document alignment, allocator, threading, and build differences that remain construct-validity threats.
+- document alignment, allocator, threading, and build differences that remain validity threats.
 
 See [`docs/VENDOR_BENCHMARKS.md`](docs/VENDOR_BENCHMARKS.md).
 
@@ -48,20 +67,20 @@ Architecture-specific optimizations must not silently make the portable library 
 A SIMD/codelet contribution must:
 
 - retain a scalar implementation or another documented portable fallback;
-- gate every explicit optional ISA using a correct runtime capability check before execution;
-- reject unsupported explicit ISA requests rather than executing undefined instructions;
-- keep explicit kernel choices available even when an `Auto` policy exists, so dispatch can be audited;
-- test each supported explicit path against an independent/reference implementation and verify inverse round trips;
-- document compiler target requirements and the exact ISA/FMA feature set;
-- report persistent-state and setup-cost changes introduced to improve vector access;
+- runtime-gate every optional ISA;
+- reject unsupported explicit ISA requests;
+- keep explicit kernel choices available even when `Auto` exists;
+- test each supported explicit path against a reference and verify inverse round trips;
+- document compiler target requirements and exact ISA/FMA feature sets;
+- report persistent-state and setup-cost changes introduced for vector access;
 - separate algorithm changes from machine-code/layout changes wherever possible;
-- preserve all explicit-width benchmark samples rather than reporting only the automatically selected winner;
-- report auto-tuning cost and the selected policy per independent session;
-- treat a wider vector width as a hypothesis, not an assumed win.
+- preserve all explicit-width benchmark samples rather than reporting only an automatic winner;
+- report auto-tuning cost and selected policy per independent session;
+- treat wider vectors as a hypothesis, not an assumed win.
 
-FMA kernels may differ from scalar code by floating-point rounding because fusion removes an intermediate rounding step. Correctness should therefore use a justified numerical tolerance rather than requiring bitwise equality unless bitwise reproducibility is itself the research objective.
+FMA kernels may differ from scalar code by floating-point rounding because fusion removes an intermediate rounding step. Use justified numerical tolerances rather than requiring bitwise identity unless bitwise reproducibility is itself the research objective.
 
-An adaptive policy that occasionally disagrees with the best pooled explicit result is evidence about the tuner. Do not hard-code a benchmark-derived crossover merely to make the auto policy appear perfect. A static crossover may be introduced only with separately justified external-validity evidence and an explicit fallback/re-tuning strategy.
+An adaptive policy that disagrees with the best pooled explicit result is evidence about the tuner. Do not hard-code a benchmark-derived crossover merely to make the auto policy appear perfect.
 
 See [`docs/SIMD_KERNELS.md`](docs/SIMD_KERNELS.md).
 
@@ -73,6 +92,8 @@ For real-input studies, do not silently benchmark an N-point complex transform w
 
 For ISA studies, compare explicit implementations in the same randomized sessions whenever practical. Record CPU model, virtualization status, compiler, flags, capability set, and relevant library/runtime build. A CPUID feature bit is not performance evidence.
 
+If tooling constraints require a reversible raw-data transport encoding, record the canonical raw-file hash and make the analyzer reconstruct the representation deterministically. Never replace raw observations with aggregates merely because binary upload is inconvenient.
+
 ## Research claims
 
 Claims should be specific enough to falsify. Prefer:
@@ -83,7 +104,7 @@ Avoid:
 
 > A is the fastest FFT.
 
-For planning claims, state both setup cost and timed execution semantics. For vendor comparisons, report steady-state execution and setup/amortization when planner costs differ materially. For SIMD claims, state the explicit ISA, size range, compiler/environment, and uncertainty; do not generalize one measured AVX2/AVX-512 crossover to all processors.
+For planning claims, state both setup cost and timed execution semantics. For prime reductions, state the convolution lengths and whether Rader used a direct cyclic FFT. For vendor comparisons, report steady-state execution and setup/amortization when planner costs differ materially. For SIMD claims, state the explicit ISA, size range, compiler/environment, and uncertainty.
 
 ## Validation
 
@@ -99,24 +120,16 @@ cmake --build build-asan -j
 ctest --test-dir build-asan --output-on-failure
 ```
 
-Plan changes:
+Specialized changes should also run their direct self-tests:
 
 ```bash
 ./build/fft-plan --self-test
-```
-
-FFTW adapter changes:
-
-```bash
 ./build/fft-vendor --info
 ./build/fft-vendor --self-test
-```
-
-SIMD/codelet changes:
-
-```bash
 ./build/fft-kernel --info
 ./build/fft-kernel --self-test
+./build/fft-arbitrary --info
+./build/fft-arbitrary --self-test
 ```
 
-When multiple compilers are supported, architecture-specific code should be validated under each available compiler and under sanitizers where the sanitizer/toolchain supports the selected ISA paths.
+When multiple compilers are supported, architecture- or planner-specific code should be validated under each available compiler and under sanitizers where supported.
