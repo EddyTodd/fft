@@ -1,0 +1,52 @@
+{
+  "schema": 1,
+  "timestamp_utc": "20260812T074300Z",
+  "source_commit": "372d59c592b9b7c8e30b7d168bf6c37449406509",
+  "raw_data_commit": "25eb66e6600fce8e296b6e92adaa8abb0e1b22fc",
+  "platform": "Linux-6.18.35-x86_64-with-glibc2.41",
+  "machine": "x86_64",
+  "cpu": "AMD EPYC 9V74 80-Core Processor",
+  "python": "3.13.5",
+  "logical_cpus": 5,
+  "compiler": "g++ (Debian 14.2.0-19) 14.2.0",
+  "build": "-O3 -DNDEBUG -std=c++23; no LTO; FFT_NATIVE=OFF equivalent",
+  "sizes": [64, 256, 1024, 4096, 16384, 65536],
+  "sessions": 3,
+  "modes": ["complex-setup", "real-setup", "legacy-complex", "planned-complex", "planned-real"],
+  "samples_per_mode_per_session": 31,
+  "total_timing_observations": 2790,
+  "warmups": 5,
+  "target_ms": 2.0,
+  "randomization_seed": 20260812,
+  "timing_semantics": "forward+inverse pair divided by two; no allocation or trig setup in planned kernels; legacy uses the existing in-place radix-2 kernel; setup is timed separately; mode order randomized inside each sample and size order randomized per session",
+  "source_provenance": "The planned.cpp and plan_main.cpp benchmark implementation is exact to source_commit. The formal development binary linked that source against the legacy radix2_inplace logic from src/power2.cpp. The source commit remains in PR history before the raw-data commit.",
+  "raw_files": {
+    "raw/timings-session0.csv.gz": {
+      "observations": 930,
+      "sha256": "f62ee406e6fb8defb8ce1c731560e142c0e321a0abb91fe23a828035a3e50dca",
+      "git_blob": "139e94a742fa5cdb30927b86cfa565fd6ee9506d"
+    },
+    "raw/timings-session1.csv.gz": {
+      "observations": 930,
+      "sha256": "b68771260581e6bd59a15976458b9b3c2f4dfc6cdfd820d9961ab9a9ddaf4c83",
+      "git_blob": "caa701ef86fb5450bde3e41a849950c368d7d443"
+    },
+    "raw/timings-session2.csv.gz": {
+      "observations": 930,
+      "sha256": "9ee20a1e5fe85790726429ab7d30d8f271508f116261cfeafbf86657a859c11b",
+      "git_blob": "69e04601978d820ffd2108a890beb0b86ec906b0"
+    }
+  },
+  "analysis": {
+    "tool": "tools/analyze_plan.py",
+    "bootstrap_seed": 20260812,
+    "bootstrap_repetitions_per_ratio": 5000,
+    "analysis_sha256": "2e793ec5a8387dabc0a71735949d116b97340e7e717d3ea610e5be3a581f211c"
+  },
+  "validation": {
+    "gcc_14_2_planned_checks": 1233,
+    "clang_17_planned_checks": 1233,
+    "asan_ubsan_planned_checks": 1233
+  },
+  "scope_note": "Virtualized/containerized development baseline. Suitable for validating implementation-specific hypotheses and the planning benchmark protocol; not a universal hardware ranking."
+}
