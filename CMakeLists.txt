@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(fft VERSION 5.0.0 LANGUAGES CXX)
+project(fft VERSION 6.0.0 LANGUAGES CXX)
 
 option(FFT_NATIVE "Enable host-specific ISA optimizations" OFF)
 option(FFT_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
@@ -12,6 +12,7 @@ add_library(fftlab STATIC
     src/research.cpp
     src/planned.cpp
     src/kernel.cpp
+    src/arbitrary_plan.cpp
 )
 add_library(fftlab::fftlab ALIAS fftlab)
 target_include_directories(fftlab
@@ -45,7 +46,14 @@ target_link_libraries(fft-kernel PRIVATE fftlab::fftlab ${CMAKE_DL_LIBS})
 target_compile_features(fft-kernel PRIVATE cxx_std_23)
 set_target_properties(fft-kernel PROPERTIES CXX_EXTENSIONS OFF)
 
-foreach(target fftlab fft fft-plan fft-vendor fft-kernel)
+# Prime/arbitrary-length planning benchmark. Bluestein and Rader remain
+# dependency-free; FFTW is loaded dynamically only for the production baseline.
+add_executable(fft-arbitrary src/arbitrary_bench.cpp)
+target_link_libraries(fft-arbitrary PRIVATE fftlab::fftlab ${CMAKE_DL_LIBS})
+target_compile_features(fft-arbitrary PRIVATE cxx_std_23)
+set_target_properties(fft-arbitrary PROPERTIES CXX_EXTENSIONS OFF)
+
+foreach(target fftlab fft fft-plan fft-vendor fft-kernel fft-arbitrary)
     if(MSVC)
         target_compile_options(${target} PRIVATE /W4 /permissive-)
     else()
@@ -58,15 +66,17 @@ if(FFT_NATIVE)
         target_compile_options(fftlab PRIVATE /arch:AVX2)
         target_compile_options(fft-vendor PRIVATE /arch:AVX2)
         target_compile_options(fft-kernel PRIVATE /arch:AVX2)
+        target_compile_options(fft-arbitrary PRIVATE /arch:AVX2)
     else()
         target_compile_options(fftlab PRIVATE -march=native)
         target_compile_options(fft-vendor PRIVATE -march=native)
         target_compile_options(fft-kernel PRIVATE -march=native)
+        target_compile_options(fft-arbitrary PRIVATE -march=native)
     endif()
 endif()
 
 if(FFT_SANITIZERS AND NOT MSVC AND CMAKE_BUILD_TYPE MATCHES "Debug|RelWithDebInfo")
-    foreach(target fftlab fft fft-plan fft-vendor fft-kernel)
+    foreach(target fftlab fft fft-plan fft-vendor fft-kernel fft-arbitrary)
         target_compile_options(${target} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
         target_link_options(${target} PRIVATE -fsanitize=address,undefined)
     endforeach()
@@ -78,7 +88,7 @@ if(FFT_LTO)
     if(NOT ipo_ok)
         message(FATAL_ERROR "IPO/LTO requested but unsupported: ${ipo_error}")
     endif()
-    foreach(target fftlab fft fft-plan fft-vendor fft-kernel)
+    foreach(target fftlab fft fft-plan fft-vendor fft-kernel fft-arbitrary)
         set_property(TARGET ${target} PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
     endforeach()
 endif()
@@ -92,3 +102,4 @@ add_test(NAME fft_planned_smoke COMMAND fft-plan --benchmark --size 256 --sample
 add_test(NAME fft_vendor_self_test COMMAND fft-vendor --self-test)
 set_tests_properties(fft_vendor_self_test PROPERTIES SKIP_RETURN_CODE 77)
 add_test(NAME fft_kernel_self_test COMMAND fft-kernel --self-test)
+add_test(NAME fft_arbitrary_self_test COMMAND fft-arbitrary --self-test)
