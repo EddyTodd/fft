@@ -94,12 +94,74 @@ A full N-point complex FFT applied to real-valued data ignores known structure. 
 
 The asymptotic class remains `O(N log N)`, but the constant factors and memory traffic are reduced. The exact speedup is empirical because packing, post-processing, cache behavior, compiler optimization, and vectorization all matter.
 
+Using the repository's canonical radix-2 structural model with `M=N/2`, the complex core contributes approximately
+
+```text
+M log2(M) complex additions
+(M/2) log2(M) complex multiplications
+```
+
+plus O(N) recombination. The current forward recombination performs roughly three complex add/subtract operations and one nontrivial twiddle multiplication per returned bin before accounting for endpoint/trivial-factor simplifications. This is intentionally a structural description rather than a CPU-FLOP claim.
+
 The specialization should therefore be evaluated on two axes:
 
 1. **structural advantage** — fewer nonredundant frequency values and a smaller complex FFT;
 2. **measured advantage** — observed latency and memory behavior on a concrete machine.
 
-## 6. Execution benchmark contract
+## 6. Persistent state and caller memory
+
+Planning trades repeated setup arithmetic for retained metadata. The storage model is explicit so a latency win cannot hide an unreported memory cost.
+
+### Complex radix-2 plan
+
+`Radix2Plan(N)` retains:
+
+```text
+N     size_t indices
+N/2   complex<double> twiddles
+```
+
+On a conventional 64-bit target where `sizeof(size_t)=8` and `sizeof(complex<double>)=16`, the element payload is approximately
+
+```text
+8N + 16(N/2) = 16N bytes
+```
+
+excluding vector/object headers, allocator bookkeeping, and spare capacity.
+
+Planned complex execution is in-place and requires no plan-owned scratch buffer. The caller's transform array itself is `N` complex doubles, or approximately `16N` bytes.
+
+### Real radix-2 plan
+
+`RealRadix2Plan(N)` contains an `M=N/2` complex plan plus `M+1` post-processing twiddles. Its retained element payload is therefore approximately
+
+```text
+M size_t indices                 = 4N bytes
+(M/2) complex twiddles           = 4N bytes
+(M+1) complex post-twiddles      = 8N + 16 bytes
+------------------------------------------------
+total                            ≈ 16N + 16 bytes
+```
+
+again excluding object/container/allocator overhead.
+
+For one real forward transform the caller supplies:
+
+```text
+N doubles input                  = 8N bytes
+(N/2+1) complex half-spectrum    = 8N + 16 bytes
+N/2 complex scratch              = 8N bytes
+------------------------------------------------
+concurrent caller payload        ≈ 24N + 16 bytes
+```
+
+The inverse has the same leading-order caller payload: half-spectrum input, N real outputs, and N/2 complex scratch.
+
+A full N-bin complex spectrum would require `16N` bytes by itself; the packed real spectrum requires approximately `8N+16`, asymptotically halving frequency-domain output storage. The scratch buffer means total working-set behavior still requires empirical measurement rather than inferring cache performance from output size alone.
+
+These byte estimates are representation-level models. `sizeof` values and allocator overhead should be recorded directly when publishing results on unusual ABIs or alternative complex representations.
+
+## 7. Execution benchmark contract
 
 `fft-plan` uses forward+inverse pairs so the same preallocated buffer can be reused indefinitely without copying a fresh input into the timed region. Pair elapsed time is divided by two and reported as nanoseconds per transform.
 
@@ -121,7 +183,7 @@ Important semantics:
 - formal experiments additionally randomize transform-size order across sessions;
 - all raw samples are retained.
 
-## 7. Planned-real break-even
+## 8. Planned-real break-even
 
 A second break-even metric asks whether the real specialization's setup overhead is justified relative to a reusable N-point complex plan:
 
@@ -132,7 +194,7 @@ real break-even = max(0, median(real setup) - median(complex setup)) /
 
 This is intentionally conservative: if the real plan costs no more to construct than the full complex plan in a recorded run, the extra setup penalty is zero.
 
-## 8. Correctness requirements
+## 9. Correctness requirements
 
 The dedicated planned self-test checks:
 
@@ -144,7 +206,7 @@ The dedicated planned self-test checks:
 
 The planned API does not resize user buffers. Incorrect buffer sizes are rejected rather than silently allocating or truncating data.
 
-## 9. What this enables next
+## 10. What this enables next
 
 The plan abstraction establishes the benchmark contract required for fair production-library comparisons. Future backends should expose, or be normalized to, at least these phases:
 
@@ -168,7 +230,7 @@ Production-library studies must additionally control:
 
 Without these controls, a headline library ranking would be scientifically weak even if the timing code itself were precise.
 
-## 10. Current limitations
+## 11. Current limitations
 
 The v3 plan layer is deliberately narrow:
 
