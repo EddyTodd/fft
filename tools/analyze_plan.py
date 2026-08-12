@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import csv
+import gzip
 import math
 import random
 import statistics
@@ -26,31 +27,55 @@ def ratio_ci(a, b, rng, reps=5000):
     return percentile(boots, .025), percentile(boots, .975)
 
 
+def input_paths(source):
+    source = Path(source)
+    if source.is_dir():
+        return sorted([*source.glob('*.csv'), *source.glob('*.csv.gz')])
+    return [source]
+
+
+def load_rows(path):
+    opener = gzip.open if path.suffix == '.gz' else open
+    with opener(path, 'rt', newline='') as f:
+        return list(csv.DictReader(f))
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('csv')
+    ap.add_argument('source', help='raw CSV, .csv.gz, or directory containing either')
     ap.add_argument('--seed', type=int, default=20260812)
     ap.add_argument('--output')
     args = ap.parse_args()
 
-    with open(args.csv, newline='') as f:
-        rows = list(csv.DictReader(f))
+    paths = input_paths(args.source)
+    if not paths:
+        raise SystemExit('no CSV inputs found')
+    rows = []
+    for path in paths:
+        rows.extend(load_rows(path))
 
     grouped = defaultdict(list)
     for row in rows:
         grouped[(int(row['N']), row['mode'])].append(float(row['ns']))
 
+    required = {'complex-setup', 'real-setup', 'legacy-complex', 'planned-complex', 'planned-real'}
+    sizes = sorted({key[0] for key in grouped})
+    for n in sizes:
+        missing = required - {mode for size, mode in grouped if size == n}
+        if missing:
+            raise SystemExit(f'N={n} missing modes: {sorted(missing)}')
+
     rng = random.Random(args.seed)
     lines = [
         '# Planned and real FFT analysis',
         '',
-        f'Raw observations: **{len(rows):,}**. Bootstrap seed: `{args.seed}`.',
+        f'Raw observations: **{len(rows):,}** from **{len(paths)}** input file(s). Bootstrap seed: `{args.seed}`.',
         '',
         '| N | Legacy complex | Planned complex | Plan speedup (95% CI) | Planned real | Real speedup (95% CI) | Complex setup | Plan break-even | Real setup | Real break-even |',
         '|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|'
     ]
 
-    for n in sorted({key[0] for key in grouped}):
+    for n in sizes:
         legacy = grouped[n, 'legacy-complex']
         planned = grouped[n, 'planned-complex']
         real = grouped[n, 'planned-real']
