@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import argparse
+import base64
 import csv
 import gzip
+import io
 import math
 import random
 import statistics
@@ -35,7 +37,22 @@ def input_files(path):
 
 def read_rows(path):
     rows = []
-    for file in input_files(path):
+    root = Path(path)
+    if root.is_dir():
+        parts = sorted(root.rglob('*.b64part*'))
+        groups = {}
+        for part in parts:
+            prefix = str(part).split('.b64part', 1)[0]
+            groups.setdefault(prefix, []).append(part)
+        for prefix, group in sorted(groups.items()):
+            encoded = ''.join(part.read_text().strip() for part in sorted(group))
+            decoded = base64.b64decode(encoded)
+            text = gzip.decompress(decoded).decode('utf-8') if prefix.endswith('.gz') else decoded.decode('utf-8')
+            rows.extend(csv.DictReader(io.StringIO(text)))
+        regular = [file for file in input_files(root) if '.b64part' not in file.name]
+    else:
+        regular = input_files(root)
+    for file in regular:
         opener = gzip.open if file.suffix == '.gz' else open
         with opener(file, 'rt', newline='') as stream:
             rows.extend(csv.DictReader(stream))
