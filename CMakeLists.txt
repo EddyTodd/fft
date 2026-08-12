@@ -1,28 +1,63 @@
 cmake_minimum_required(VERSION 3.20)
-project(fft VERSION 1.0.0 LANGUAGES CXX)
+project(fft VERSION 2.0.0 LANGUAGES CXX)
 
-option(FFT_NATIVE "Enable -march=native or MSVC equivalent optimizations" OFF)
+option(FFT_NATIVE "Enable host-specific ISA optimizations" OFF)
 option(FFT_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+option(FFT_LTO "Enable interprocedural optimization when supported" OFF)
 
-add_executable(fft fft.cpp)
+add_library(fftlab STATIC
+    src/common.cpp
+    src/power2.cpp
+    src/arbitrary.cpp
+    src/research.cpp
+)
+add_library(fftlab::fftlab ALIAS fftlab)
+target_include_directories(fftlab
+    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    PRIVATE src
+)
+target_compile_features(fftlab PUBLIC cxx_std_23)
+set_target_properties(fftlab PROPERTIES CXX_EXTENSIONS OFF)
+
+add_executable(fft src/main.cpp)
+target_link_libraries(fft PRIVATE fftlab::fftlab)
 target_compile_features(fft PRIVATE cxx_std_23)
 set_target_properties(fft PROPERTIES CXX_EXTENSIONS OFF)
 
-if(MSVC)
-    target_compile_options(fft PRIVATE /W4 /permissive-)
-    if(FFT_NATIVE)
-        target_compile_options(fft PRIVATE /arch:AVX2)
+foreach(target fftlab fft)
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /W4 /permissive-)
+    else()
+        target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wshadow)
     endif()
-else()
-    target_compile_options(fft PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wshadow)
-    if(FFT_NATIVE)
-        target_compile_options(fft PRIVATE -march=native)
+endforeach()
+
+if(FFT_NATIVE)
+    if(MSVC)
+        target_compile_options(fftlab PRIVATE /arch:AVX2)
+    else()
+        target_compile_options(fftlab PRIVATE -march=native)
     endif()
-    if(FFT_SANITIZERS AND CMAKE_BUILD_TYPE MATCHES "Debug|RelWithDebInfo")
-        target_compile_options(fft PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
-        target_link_options(fft PRIVATE -fsanitize=address,undefined)
+endif()
+
+if(FFT_SANITIZERS AND NOT MSVC AND CMAKE_BUILD_TYPE MATCHES "Debug|RelWithDebInfo")
+    foreach(target fftlab fft)
+        target_compile_options(${target} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
+        target_link_options(${target} PRIVATE -fsanitize=address,undefined)
+    endforeach()
+endif()
+
+if(FFT_LTO)
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT ipo_ok OUTPUT ipo_error)
+    if(NOT ipo_ok)
+        message(FATAL_ERROR "IPO/LTO requested but unsupported: ${ipo_error}")
     endif()
+    set_property(TARGET fftlab PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+    set_property(TARGET fft PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()
 
 enable_testing()
 add_test(NAME fft_self_test COMMAND fft --self-test)
+add_test(NAME fft_accuracy_smoke COMMAND fft --verify --algorithm split-radix --size 64 --signal random)
+add_test(NAME fft_rader_smoke COMMAND fft --verify --algorithm rader --size 31 --signal dynamic-range)
