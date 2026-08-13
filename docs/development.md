@@ -40,6 +40,8 @@ ctest --preset package
 
 The install exports `fftlab::fftlab`, all permanent public FFT/planning headers, relocatable package/version files, and the project license. The prefix is local to the checkout and can be consumed by a separate project through `CMAKE_PREFIX_PATH` or `fftlab_DIR`.
 
+Normal non-sanitized standalone CTest graphs also run `fftlab.package-consumer`. The test installs the current build into an isolated prefix, configures a separate project with `find_package(fftlab 1 CONFIG REQUIRED)`, and compiles it against the installed `fftlab::fftlab` target. This catches missing headers and non-relocatable export metadata that source-tree correctness tests cannot detect. Sanitizer configurations omit this downstream distribution smoke because sanitizer runtime requirements are a separate consumer contract.
+
 ## Research boundary
 
 The shared presets build and test the permanent v1 library only. Historical research C++ sources under `research/` and Python campaign/analysis programs under `tools/` are migration assets, not part of the normal development graph.

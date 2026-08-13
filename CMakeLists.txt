@@ -65,6 +65,12 @@ if(BUILD_TESTING AND FFTLAB_BUILD_TESTS)
 
     add_test(NAME fftlab_core_correctness COMMAND fftlab_core_correctness)
     add_test(NAME fftlab_kernel_correctness COMMAND fftlab_kernel_correctness)
+    if(NOT FFTLAB_ENABLE_SANITIZERS)
+        include(cmake/PackageConsumerTest.cmake)
+        register_package_consumer_test(
+            fftlab.package-consumer
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/package-consumer")
+    endif()
 endif()
 
 install(TARGETS fftlab
