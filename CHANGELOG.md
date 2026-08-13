@@ -8,6 +8,7 @@ All notable changes to `fftlab` are recorded here. The installed C++ library fol
 
 - Standard `dev`, `release`, `sanitize`, and checkout-local `package` CMake presets.
 - External installed-package consumer smoke testing.
+- Installed-package smoke physically relocates the complete install tree before downstream configure/build/runtime execution, catching absolute-prefix leaks.
 - Installed-package smoke now executes the linked scalar `KernelRadix2Plan` downstream after install/configure/build and verifies a deterministic forward/inverse transform.
 - Build-time independent compilation of all 15 declared public FFT headers.
 - Dependency-free release metadata verification across CMake, the public version header, citation metadata, and changelog history.
