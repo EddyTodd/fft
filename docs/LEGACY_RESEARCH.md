@@ -1,21 +1,32 @@
 # Legacy research assets pending migration to EddyTodd/bench
 
-The fft repository accumulated a useful empirical research layer while the algorithm implementations were still being designed. Version 1.0 separates that layer from the permanent installable library rather than deleting its evidence prematurely.
+The FFT repository accumulated a useful empirical research layer while the algorithm implementations were still being designed. Version 1.0 separates that layer physically as well as logically from the permanent installable library rather than deleting its evidence prematurely.
 
 None of the files listed below are linked into `fftlab::fftlab` or installed by CMake.
 
 ## Benchmark / research C++ sources
 
-These development-era sources should eventually move, be replaced by bench adapters, or be deleted after equivalent coverage exists in `EddyTodd/bench`:
+Historical frontends now live under `research/apps/`:
 
-- `src/research.cpp` — timing statistics, accuracy campaign glue, algorithm suites;
-- `src/main.cpp` — historical research CLI;
-- `src/plan_main.cpp` — plan timing CLI;
-- `src/vendor_bench.cpp` — FFTW timing adapter;
-- `src/kernel_bench.cpp` — SIMD timing/tuning study adapter;
-- `src/arbitrary_bench.cpp` — arbitrary-plan/vendor timing adapter.
+- `main.cpp` — historical research CLI;
+- `plan_main.cpp` — plan timing CLI;
+- `vendor_bench.cpp` — FFTW timing adapter;
+- `kernel_bench.cpp` — SIMD timing/tuning adapter;
+- `arbitrary_bench.cpp` — arbitrary-plan/vendor timing adapter.
 
-Several older implementation translation units (`src/common.cpp`, `src/power2.cpp`, `src/arbitrary.cpp`, `src/planned.cpp`, `src/arbitrary_plan.cpp`) remain development-history sources after the stable algorithms/plans were consolidated into the installed templated headers. They are not compiled by v1 and can be removed once historical benchmark adapters no longer depend on them.
+Development-era implementation/support sources now live under `research/legacy-src/`:
+
+- `research.cpp` — timing statistics, accuracy campaign glue, algorithm suites;
+- `common.cpp`;
+- `power2.cpp`;
+- `arbitrary.cpp`;
+- `planned.cpp`;
+- `arbitrary_plan.cpp`;
+- `internal.hpp`.
+
+These remain byte-identical historical sources. They are retained only until corresponding benchmark/evidence migration is complete.
+
+The permanent `src/` directory now contains only `kernel.cpp`, the non-header implementation compiled by v1. The stable algorithms and plans otherwise live in installed templated headers.
 
 ## Python campaign and analysis tools
 
@@ -57,4 +68,4 @@ During migration, preserve any FFT-specific mathematical explanation in this rep
 
 ## Migration rule
 
-Do not move or delete historical evidence until its exact source/raw-data relationship can be represented in `bench`. The v1 library completion milestone changes the build/API boundary now; evidence migration can then happen independently without destabilizing Fourier-transform code.
+Do not delete historical evidence until its exact source/raw-data relationship can be represented in `bench`. Physical relocation inside this repository preserves the same blobs and Git history; it is source-tree sanitation, not evidence deletion.
