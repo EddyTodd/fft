@@ -11,6 +11,14 @@ Before tagging, synchronize:
 - `version` and `date-released` in `CITATION.cff`;
 - the matching entry in `CHANGELOG.md`.
 
+Run the dependency-free metadata verifier before the build matrix:
+
+```sh
+cmake -P cmake/VerifyReleaseMetadata.cmake
+```
+
+It derives the project version from CMake and fails if the public version header, citation version/date, or changelog release entry is inconsistent.
+
 A release tag must point permanently at the exact validated source revision.
 
 ## Required validation
