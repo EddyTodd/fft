@@ -44,6 +44,27 @@ target_include_directories(fftlab
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
+target_sources(fftlab PUBLIC
+    FILE_SET public_headers
+    TYPE HEADERS
+    BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/include
+    FILES
+        include/fftlab/arbitrary_algorithms.hpp
+        include/fftlab/arbitrary_plan.hpp
+        include/fftlab/codelet.hpp
+        include/fftlab/convolution_plan.hpp
+        include/fftlab/fft.hpp
+        include/fftlab/fftlab.hpp
+        include/fftlab/good_thomas_plan.hpp
+        include/fftlab/kernel.hpp
+        include/fftlab/mixed_plan.hpp
+        include/fftlab/oracle.hpp
+        include/fftlab/plan.hpp
+        include/fftlab/planner.hpp
+        include/fftlab/power2_algorithms.hpp
+        include/fftlab/types.hpp
+        include/fftlab/version.hpp
+)
 fftlab_apply_warnings(fftlab)
 fftlab_apply_sanitizers(fftlab)
 
@@ -75,12 +96,12 @@ endif()
 
 install(TARGETS fftlab
     EXPORT fftlabTargets
+    FILE_SET public_headers DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
-install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 configure_package_config_file(
     cmake/fftlabConfig.cmake.in
