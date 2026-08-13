@@ -28,6 +28,18 @@ ctest --preset sanitize
 
 The sanitizer preset enables `FFTLAB_ENABLE_SANITIZERS=ON` and `FFTLAB_WARNINGS_AS_ERRORS=ON`.
 
+## Install-package check
+
+The `package` preset installs a Release build into `build/package-prefix`:
+
+```sh
+cmake --preset package
+cmake --build --preset package
+ctest --preset package
+```
+
+The install exports `fftlab::fftlab`, all permanent public FFT/planning headers, relocatable package/version files, and the project license. The prefix is local to the checkout and can be consumed by a separate project through `CMAKE_PREFIX_PATH` or `fftlab_DIR`.
+
 ## Research boundary
 
 The shared presets build and test the permanent v1 library only. Historical research C++ sources under `research/` and Python campaign/analysis programs under `tools/` are migration assets, not part of the normal development graph.
