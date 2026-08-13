@@ -1,88 +1,70 @@
-# FFT theory and algorithm taxonomy
+# FFT theory and v1 algorithm taxonomy
 
-## 1. Transform convention
+## Transform convention
 
-For complex input \(x_0,\dots,x_{N-1}\), this project uses
+For complex input `x[0..N-1]`, fftlab computes
 
-\[
-X_k = \sum_{n=0}^{N-1} x_n e^{-2\pi i kn/N}.
-\]
+`X[k] = sum_n x[n] exp(-2*pi*i*k*n/N)`.
 
-The forward transform is unnormalized. The inverse uses the positive exponential and a final \(1/N\) scale. All implemented algorithms are intended to compute the same mathematical DFT; differences in measured output are floating-point effects, not different transform definitions.
+Forward transforms are unnormalized. Inverse transforms use the positive exponential and apply `1/N` normalization.
 
-## 2. Algorithms represented
+## Representative catalog
 
-| Implementation | Domain | Core idea | Time | Extra workspace | Research question |
-|---|---|---|---:|---:|---|
-| Direct DFT | any N | definition | \(O(N^2)\) | \(O(N)\) | baseline and reference cross-check |
-| Iterative radix-2 DIT | powers of two | bit reversal + butterflies | \(O(N\log N)\) | \(O(1)\) besides returned copy | practical in-place baseline |
-| Recursive radix-2 | powers of two | explicit divide-and-conquer | \(O(N\log N)\) | \(O(N)\) peak | recursion/allocation cost |
-| Stockham radix-2 | powers of two | autosort/ping-pong stages | \(O(N\log N)\) | \(O(N)\) | regular access vs extra traffic |
-| Radix-4 | powers of two | 4-way decomposition, radix-2 base | \(O(N\log N)\) | \(O(N)\) | fewer stages vs larger butterflies |
-| Split-radix | powers of two | one N/2 + two N/4 transforms | \(O(N\log N)\) | \(O(N)\) | arithmetic count vs locality/overhead |
-| Mixed-radix | composite N | Cooley–Tukey by factors | typically \(O(N\log N)\) | \(O(N)\) | factorization sensitivity |
-| Rader | prime N | prime DFT → cyclic convolution | \(O(M\log M)\) | \(O(M)\) | prime-length alternative to Bluestein |
-| Bluestein | any N | chirp-z → convolution | \(O(M\log M)\) | \(O(M)\) | robust arbitrary-length fallback |
-| Auto | any N | inspectable dispatch policy | varies | varies | empirical dispatch research |
+| Mechanism | Domain | Key role in v1 |
+|---|---|---|
+| Direct DFT | any N | mathematical definition and small-size oracle comparison |
+| Iterative radix-2 | powers of two | canonical in-place Cooley-Tukey baseline |
+| Recursive radix-2 | powers of two | explicit divide-and-conquer form |
+| Stockham radix-2 | powers of two | autosort/ping-pong staging |
+| Radix-4 | powers of two | larger radix butterfly family |
+| Classical split-radix | powers of two | N/2 + two N/4 decomposition |
+| Modified split-radix | powers of two | Johnson-Frigo scaled conjugate-pair arithmetic reduction mechanism |
+| Mixed-radix | composite | Cooley-Tukey over nonuniform factors |
+| Good-Thomas / PFA | coprime composite factors | CRT permutation with no cross-stage twiddles |
+| Rader | prime N | prime DFT -> cyclic convolution |
+| Bluestein | any N | chirp-z reduction -> convolution |
+| Small codelets | radix 2/3/4/5/7 | planned small-factor kernels |
 
-Here \(M\) is the power-of-two convolution size required by the reduction.
+The free algorithm functions emphasize readable mechanisms. Reusable plans precompute state and separate construction from execution.
 
-## 3. Structural operation models
+## Planned mixed-radix
 
-`fft --complexity` reports a **structural complex-operation model**. It is intentionally not labeled as an exact CPU instruction count or FLOP count.
+For `N=r*m`, a Cooley-Tukey decomposition recursively transforms `m`-point subsequences, applies stage twiddles, and combines `r` values with a small DFT. `MixedRadixPlan<T>` stores the stage twiddles and reusable codelet state during construction.
 
-For a power-of-two radix-2 transform with \(L=\log_2 N\):
+The v1 codelet set covers radices 2, 3, 4, 5, and 7. Radix-2/4 use explicit butterflies. Radix-3/5/7 use precomputed root matrices, so plan execution does not evaluate trigonometric functions.
 
-- complex butterfly additions/subtractions: \(N L\);
-- nontrivial butterfly multiply slots: \((N/2)L\).
+## Good-Thomas / Prime Factor Algorithm
 
-The implementation also performs twiddle-generation arithmetic, loop/index work, loads/stores, branches, allocation, and transcendental setup. Those costs are not represented by the structural model.
+When `N=a*b` with `gcd(a,b)=1`, the Chinese Remainder Theorem can map the one-dimensional DFT index into a two-dimensional product group. The transform then becomes `a`- and `b`-point transforms plus input/output permutations, without the cross twiddle factors required by ordinary Cooley-Tukey at that decomposition level.
 
-For split-radix, this repository uses the recurrence
+`GoodThomasPlan<T>` explicitly stores the CRT permutations and exposes `twiddle_count()==0` for the top-level PFA decomposition. Its row/column transforms are themselves reusable mixed-radix plans.
 
-\[
-A(N)=A(N/2)+2A(N/4)+3N/2,
-\]
+## Classical and modified split-radix
 
-\[
-M(N)=M(N/2)+2M(N/4)+N/2,
-\]
+Classical split-radix decomposes a power-of-two DFT into one even `N/2` transform and two odd `N/4` transforms. It is retained directly because it is historically and structurally important.
 
-where multiplication by \(\pm i\) is treated as trivial. This model is useful for comparing decomposition structure, not for claiming an exact real-arithmetic record.
+The modified split-radix family reduces real arithmetic further by recursively rescaling subtransforms. In the Johnson-Frigo construction, these scale factors turn selected ordinary complex twiddle products into tangent/cotangent forms that require fewer real multiplications. `modified_split_radix()` implements this scaled conjugate-pair mechanism in a readable recursive form.
 
-The 2007 modified split-radix work of Johnson and Frigo reduces the real arithmetic count below classical split-radix. More recent work has lowered theoretical leading constants further. This repository therefore treats “fewest operations” and “fastest implementation” as separate research dimensions.
+This implementation is a faithful mechanism/reference treatment, not a claim that a readable recursive C++ routine attains the exact instruction count of generated codelets or is the fastest machine implementation.
 
-## 4. Prime-length transforms
+## Rader and Bluestein
 
-### Rader
+Rader maps a prime-length DFT to cyclic convolution of length `N-1`. The reusable plan directly uses an `N-1` radix-2 cyclic convolution when `N-1` is already a power of two; otherwise it uses a zero-padded linear convolution and folds the result.
 
-For prime \(N\), nonzero indices form a cyclic multiplicative group. A primitive root permutes those indices, transforming the DFT into a cyclic convolution of length \(N-1\). This implementation computes that convolution using zero-padding plus radix-2 FFTs.
+Bluestein maps any DFT length to convolution using quadratic chirps. Its reusable plan stores chirps and the FFT-domain convolution kernel.
 
-### Bluestein
+The structural planner compares convolution lengths for primes: Rader is selected only when it produces a strictly shorter planned convolution; otherwise Bluestein is the conservative default.
 
-Bluestein rewrites the phase using a quadratic identity and turns an arbitrary-size DFT into a convolution. It is particularly useful when Cooley–Tukey factorization is unfavorable.
+## Real FFT reduction
 
-Rader and Bluestein have similar asymptotic forms but different convolution lengths, setup work, data permutations, and numerical behavior. Their crossover should be measured, not assumed.
+For even power-of-two `N=2M`, a real sequence can be packed into one `M`-point complex sequence by placing even samples in the real part and odd samples in the imaginary part. A post-processing identity reconstructs the `N/2+1` unique frequency bins implied by Hermitian symmetry. `RealRadix2Plan<T>` implements this reduction for f32/f64.
 
-## 5. Why operation count is insufficient
+## Planning is part of the algorithm interface
 
-Modern performance also depends on:
+A reusable FFT library must distinguish mathematical decomposition from reusable state. v1 plans expose scratch sizes and perform no dynamic allocation/trigonometric table generation during execution. Structural dispatch is deterministic and inspectable; empirical timing/autotuning is deliberately outside the stable planner.
 
-- cache and TLB behavior;
-- memory traffic and access regularity;
-- branch and instruction throughput;
-- SIMD/vectorization opportunities;
-- allocation strategy;
-- twiddle generation/storage;
-- compiler transformations;
-- transform size and factorization;
-- in-place vs out-of-place semantics;
-- setup/planning amortization.
+## Numerical behavior
 
-This is why the project reports theoretical models beside empirical timings rather than collapsing both into a single ranking.
+Floating-point FFTs accumulate rounding error through butterflies, twiddle multiplication, cancellation, and recursive/staged composition. Binary32 and binary64 therefore have separate numerical contracts. The deterministic suite compares both against a long-double direct DFT oracle and validates round-trip/identity properties.
 
-## 6. Numerical error
-
-Floating-point FFTs are not exact. Important mechanisms include rounding in butterflies, inaccurate twiddles, error accumulation through recursive/staged decomposition, and cancellation. The benchmark therefore reports normalized forward and backward errors in \(L_1\), \(L_2\), and \(L_\infty\), plus a conventional forward→inverse round-trip maximum error.
-
-The current reference is a long-double \(O(N^2)\) DFT, not arbitrary-precision arithmetic. This is much stronger than comparing algorithms only with each other, but it is still a documented limitation. A future milestone should add MPFR or another independently controlled high-precision oracle as an optional research dependency.
+Long double is a practical deterministic oracle, not arbitrary precision. Optional higher-precision research can be added later without changing the v1 transform API.

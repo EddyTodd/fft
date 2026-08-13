@@ -1,52 +1,120 @@
-# fft
+# fftlab
 
-A dependency-free **C++23 Fourier-transform research laboratory** for studying FFT algorithms theoretically, numerically, and empirically—and comparing first-principles implementations with optimized production libraries under controlled benchmark semantics.
+`fftlab` is a dependency-free C++23 library of one-dimensional CPU Fourier-transform algorithms and reusable plans. Version 1.0 freezes the repository around **algorithm mechanisms, structural planning, numerical correctness, and a reusable package API**. The benchmark campaigns accumulated during development remain in the repository only as legacy research material pending migration to [`EddyTodd/bench`](https://github.com/EddyTodd/bench).
 
-The project deliberately separates questions that are often collapsed into one timing number:
+## v1 at a glance
 
-1. **mathematical structure** — asymptotic complexity and arithmetic/decomposition choices;
-2. **numerical behavior** — forward/backward error across representative and adversarial inputs;
-3. **implementation performance** — latency, data movement, layout, code generation, and SIMD width;
-4. **planning economics** — one-time setup versus reusable steady-state execution;
-5. **workload specialization** — real/complex data, prime/composite structure, planner policy, and hardware-specific choices.
+- complex binary32 (`std::complex<float>`) and binary64 (`std::complex<double>`);
+- arbitrary transform lengths;
+- sequential CPU execution;
+- direct DFT, radix-2, recursive radix-2, Stockham, radix-4, classical split-radix, modified split-radix, mixed-radix, Good-Thomas/PFA, Rader, and Bluestein;
+- reusable radix-2, mixed-radix, Good-Thomas, Rader, Bluestein, and structural arbitrary-length plans;
+- real power-of-two plans with `N/2+1` Hermitian half spectra;
+- reusable radix-2 small codelets for radices 2/3/4/5/7;
+- explicit runtime-safe binary64 scalar/AVX2/AVX-512 radix-2 kernels;
+- deterministic long-double DFT oracle utilities;
+- installable/exported CMake package target `fftlab::fftlab`.
 
-## Algorithm and implementation taxonomy
+The precise scope and deferred domains are in [`docs/V1_SCOPE.md`](docs/V1_SCOPE.md).
 
-| Family / implementation | Domain | Research role |
-|---|---|---|
-| Direct DFT | any N | definition and quadratic baseline |
-| Iterative / recursive radix-2 | powers of two | iterative overhead and recursion/allocation studies |
-| Stockham radix-2 | powers of two | autosort and memory-traffic study |
-| Radix-4 / split-radix | powers of two | butterfly/arithmetic-count studies |
-| Mixed-radix | composite | factorization study |
-| Rader | prime | prime DFT via cyclic convolution |
-| Bluestein | any N | arbitrary-length convolution reduction |
-| `Radix2Plan` | powers of two | reusable permutation/twiddle state |
-| `RealRadix2Plan` | powers of two | packed `N/2+1` real spectrum |
-| `BluesteinPlan` | any N >= 1 | reusable chirp + convolution-kernel spectrum |
-| `RaderPlan` | prime N >= 3 | reusable prime permutations + convolution kernel |
-| `ArbitraryPlan` | any N >= 1 | structural reusable planner across radix-2/Rader/Bluestein |
-| `KernelRadix2Plan` scalar / AVX2 / AVX-512 | x86 power-of-two | matched scalar/SIMD codelet research |
-| `KernelRadix2Plan::Auto` | supported power-of-two | experimental plan-time empirical ISA selection |
-| FFTW `ESTIMATE` / `MEASURE` | runtime dependent | controlled production-library baseline |
+## Transform convention
 
-The core algorithms are implemented from first principles. FFTW is dynamically loaded only by benchmark executables and is **not** a dependency of the fftlab library.
+For `N` complex samples, the forward transform is
 
-## Repository map
+`X[k] = sum_n x[n] exp(-2*pi*i*k*n/N)`.
 
-- [`include/fftlab/fft.hpp`](include/fftlab/fft.hpp) — algorithm API
-- [`include/fftlab/plan.hpp`](include/fftlab/plan.hpp) — reusable power-of-two complex/real plans
-- [`include/fftlab/arbitrary_plan.hpp`](include/fftlab/arbitrary_plan.hpp) — reusable Bluestein/Rader/general plans
-- [`include/fftlab/kernel.hpp`](include/fftlab/kernel.hpp) — runtime-selectable radix-2 codelet plan
-- [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md) — general empirical protocol
-- [`docs/PLANNING_REAL.md`](docs/PLANNING_REAL.md) — planning lifecycle and real FFT derivation
-- [`docs/ARBITRARY_PLANS.md`](docs/ARBITRARY_PLANS.md) — arbitrary-length plan derivation, memory model, and prime protocol
-- [`docs/VENDOR_BENCHMARKS.md`](docs/VENDOR_BENCHMARKS.md) — external-library normalization contract
-- [`docs/SIMD_KERNELS.md`](docs/SIMD_KERNELS.md) — codelet/ISA design and validity rules
-- [`results/`](results/) — raw evidence, metadata, analyses, and headline history
-- [`tools/`](tools/) — standard-library experiment runners and analyzers
+Forward transforms are unnormalized. Inverse transforms use the positive exponent and divide by `N`, so `inverse(forward(x))` returns `x` up to floating-point error.
 
-## Build and validation
+The free algorithm functions treat `N=0` as an empty transform and `N=1` as identity. `Plan<T>` accepts both. Algorithm-specific plans that mathematically require a non-empty domain document and validate it explicitly.
+
+## Precision architecture
+
+The core API is templated only over the two supported v1 floating-point formats:
+
+```cpp
+fftlab::Vector32 x32;                   // vector<complex<float>>
+fftlab::Vector64 x64;                   // vector<complex<double>>
+fftlab::Plan<float>  p32(n);
+fftlab::Plan<double> p64(n);
+```
+
+Historical `Complex` and `Vector` aliases remain binary64 compatibility aliases. The algorithm and planner implementations are shared templates rather than duplicated float/double source trees.
+
+The x86 SIMD extension is intentionally binary64 in v1. Binary32 still has the full portable algorithm/planner catalog; dedicated f32 SIMD and Arm NEON are explicitly post-v1 work rather than hidden gaps in the portable API.
+
+## Structural planner
+
+`Plan<T>` is the stable arbitrary-length reusable planner. The default policy is deterministic and inspectable; it does **not** benchmark the host while constructing a plan.
+
+Current structural policy:
+
+1. `N=0/1` -> identity;
+2. powers of two -> reusable radix-2;
+3. composite lengths with a useful coprime split -> Good-Thomas/PFA by default;
+4. remaining 2/3/5/7-decomposable composites -> planned mixed-radix;
+5. rough composites -> Bluestein;
+6. primes -> Rader only when its convolution is structurally shorter than Bluestein; otherwise Bluestein.
+
+Every non-identity family can also be forced through `PlanOptions` when its domain is valid. `plan_capabilities(n)` exposes the structural possibilities for inspection/testing.
+
+```cpp
+#include <fftlab/fftlab.hpp>
+
+fftlab::Plan<double> plan(60);
+std::vector<std::complex<double>> input(60), output(60);
+std::vector<std::complex<double>> scratch(plan.scratch_size());
+plan.forward(input, output, scratch);
+```
+
+See [`docs/API.md`](docs/API.md) and [`docs/THEORY.md`](docs/THEORY.md).
+
+## Planned mixed-radix and codelets
+
+`MixedRadixPlan<T>` recursively plans Cooley-Tukey stages and uses reusable small DFT codelets for radices **2, 3, 4, 5, and 7**. Radix-2 and radix-4 have dedicated butterfly implementations; 3/5/7 root matrices are precomputed at codelet construction. Planned execution performs no dynamic allocation and no trigonometric setup.
+
+For rough internal leaves the planner can precompute a direct DFT matrix, while the top-level structural `Plan<T>` normally chooses Bluestein instead of creating a large direct leaf.
+
+## Good-Thomas / PFA
+
+`GoodThomasPlan<T>` represents the coprime-factor prime-factor algorithm. It precomputes CRT input/output permutations, performs row/column reusable subplans, and requires **zero cross-stage Cooley-Tukey twiddle factors** at the Good-Thomas decomposition level. Explicit factor pairs are supported for auditability.
+
+## Modified split-radix
+
+`modified_split_radix()` implements a readable scaled conjugate-pair treatment following the Johnson-Frigo modified split-radix mechanism: recursive scale factors transform generic odd-branch twiddle multiplications into tangent/cotangent forms with fewer real multiplications. It is retained as an algorithmic reference mechanism rather than claiming generated-codelet-level arithmetic optimality.
+
+Classical split-radix remains available separately.
+
+## Real transforms
+
+`RealRadix2Plan<T>` supports power-of-two real transforms in binary32 and binary64. Forward transforms return `N/2+1` nonredundant complex bins; inverse transforms consume that layout. Caller-owned complex scratch is explicit.
+
+```cpp
+fftlab::RealRadix2Plan<float> plan(1024);
+std::vector<float> time(1024), restored(1024);
+std::vector<std::complex<float>> spectrum(plan.spectrum_size());
+std::vector<std::complex<float>> scratch(plan.scratch_size());
+plan.forward(time, spectrum, scratch);
+plan.inverse(spectrum, restored, scratch);
+```
+
+## SIMD extension
+
+`KernelRadix2Plan` is an explicit binary64 extension with `Scalar`, `Avx2`, and `Avx512` modes. AVX modes are compiled behind function-level ISA targets on supported x86 compilers and are checked against runtime CPU capabilities before selection. Unsupported explicit requests throw; the scalar path always exists.
+
+The old timing-based `Auto` kernel tuner is not part of the v1 core API. Empirical tuning belongs in the future benchmark/planner-research layer rather than being an implicit behavior of the only library path.
+
+## Allocation, reuse, and thread safety
+
+Plan construction may allocate persistent tables/permutations. After construction:
+
+- `Radix2Plan<T>` and `KernelRadix2Plan` execute in-place without scratch allocation;
+- `MixedRadixPlan<T>`, `GoodThomasPlan<T>`, `RaderPlan<T>`, `BluesteinPlan<T>`, and real plans use caller-owned scratch;
+- planned execution does not allocate or regenerate trigonometric tables;
+- plan execution methods are `const` and persistent plan state is not mutated.
+
+A plan can therefore be reused concurrently when each invocation uses distinct input/output/scratch buffers. Use the explicit in-place APIs when aliasing is desired; out-of-place calls should use distinct input and output storage.
+
+## Build, test, install
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -54,161 +122,61 @@ cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
-For host-specific performance work:
-
-```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DFFT_NATIVE=ON
-cmake --build build -j
-```
-
 Sanitizers:
 
 ```bash
-cmake -S . -B build-asan -DCMAKE_BUILD_TYPE=Debug -DFFT_SANITIZERS=ON
+cmake -S . -B build-asan \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DFFTLAB_ENABLE_SANITIZERS=ON
 cmake --build build-asan -j
 ctest --test-dir build-asan --output-on-failure
 ```
 
-Validation depth now includes:
-
-- historical complex-algorithm suite: **14,396 checks**;
-- planned/real suite: **1,233 checks**;
-- v5 exact kernel source: **11,021 SIMD/codelet checks + 328 FFTW cross-checks**;
-- v6 final arbitrary-plan policy: **5,574 arbitrary-plan checks + 653 FFTW prime-bin cross-checks**.
-
-The v5 and v6 specialized suites passed optimized GCC 14.2, optimized Clang 17, and GCC ASan/UBSan in the recorded development environment.
-
-## Core research workflows
-
-Algorithm families and accuracy:
+Install and consume:
 
 ```bash
-./build/fft --verify --algorithm split-radix --size 1024 --signal random
-./build/fft --benchmark-suite --sizes 64,127,256,509,1009,1024
-python3 tools/run_experiment.py --binary build/fft --sessions 5 --samples 51
+cmake --install build --prefix /your/prefix
 ```
 
-Reusable power-of-two planning and real input:
-
-```bash
-./build/fft-plan --benchmark --size 4096 --samples 31 --target-ms 5
-python3 tools/run_plan_experiment.py \
-  --binary build/fft-plan --out results/run-plan \
-  --sizes 64,256,1024,4096,16384,65536 \
-  --sessions 5 --samples 51 --target-ms 5
+```cmake
+find_package(fftlab 1 CONFIG REQUIRED)
+target_link_libraries(your_target PRIVATE fftlab::fftlab)
 ```
 
-Production-library comparison:
+The package has no required FFTW dependency.
 
-```bash
-./build/fft-vendor --info
-./build/fft-vendor --self-test
-```
+## Correctness strategy
 
-SIMD/codelet study:
+The permanent deterministic suite covers both f32 and f64 and includes:
 
-```bash
-./build/fft-kernel --info
-./build/fft-kernel --self-test
-python3 tools/run_kernel_experiment.py \
-  --binary build/fft-kernel --out results/run-kernel \
-  --sizes 64,256,1024,4096,16384,65536 \
-  --sessions 3 --samples 31 --setup-samples 1 --target-ms 2 \
-  --source-commit "$(git rev-parse HEAD)"
-```
+- an independent long-double `O(N^2)` DFT oracle;
+- powers of two, mixed composites, PFA-friendly composites, primes, and awkward Bluestein fallbacks;
+- zero/one/small lengths;
+- forward/inverse round trips;
+- impulse, constant, and single-tone identities;
+- real-transform Hermitian symmetry;
+- explicit codelet checks;
+- scalar/AVX2/AVX-512 equivalence when those ISAs are available.
 
-### Arbitrary-length reusable plans
+`<fftlab/oracle.hpp>` exposes the inexpensive long-double oracle for subject-specific correctness work. It is deliberately not a benchmark/statistics API.
 
-`fft-arbitrary` compares setup-inclusive historical APIs with reusable Bluestein/Rader plans and FFTW under one prime-length harness:
+## Repository layout
 
-```bash
-./build/fft-arbitrary --info
-./build/fft-arbitrary --self-test
-./build/fft-arbitrary --raw-csv --size 509 --samples 31 --setup-samples 1
-```
+- `include/fftlab/` — stable installed API;
+- `src/kernel.cpp` — compiled explicit x86 SIMD extension;
+- `tests/` — deterministic v1 correctness tests;
+- `docs/API.md` — detailed API/lifecycle contract;
+- `docs/THEORY.md` — algorithm taxonomy/mechanisms;
+- `docs/V1_SCOPE.md` — completeness boundary and deferred domains;
+- `docs/LEGACY_RESEARCH.md` — development-era benchmark assets awaiting migration;
+- `results/`, `tools/`, historical benchmark sources — legacy empirical research, not part of the installed library.
 
-Formal study:
+## Legacy research and `EddyTodd/bench`
 
-```bash
-python3 tools/run_arbitrary_experiment.py \
-  --binary build/fft-arbitrary \
-  --out results/run-arbitrary \
-  --sizes 17,31,61,127,257,509,1009,4093 \
-  --sessions 3 --samples 31 --setup-samples 1 --target-ms 2 \
-  --source-commit "$(git rev-parse HEAD)"
+The repository contains substantial historical timing campaigns, statistical analyzers, vendor comparisons, and raw result corpora from development. They remain useful evidence, but they are **not linked into `fftlab::fftlab` and are not installed**. Their intended destination is `EddyTodd/bench`.
 
-python3 tools/analyze_arbitrary.py results/run-arbitrary/raw \
-  --bootstrap 5000 --seed 20260812
-```
-
-`BluesteinPlan` precomputes chirps, an FFT-domain convolution kernel, and an M-point radix-2 plan. `RaderPlan` precomputes prime permutations and its convolution-kernel spectrum. When `p-1` is a power of two, Rader performs the cyclic convolution **directly at length `p-1`** rather than zero-padding it to a linear convolution.
-
-`ArbitraryPlan::Auto` uses a structural policy rather than the old blanket `prime -> Rader` rule:
-
-- power of two -> radix-2;
-- prime where planned Rader has a **strictly shorter convolution** than Bluestein -> Rader;
-- otherwise -> Bluestein.
-
-Explicit Rader and Bluestein policies remain available so the decision can be audited and retested.
-
-## Current headline findings
-
-### v6 — arbitrary-length planning and prime crossover
-
-The checked-in [`results/pr6-arbitrary-plan-baseline/`](results/pr6-arbitrary-plan-baseline/) evidence represents **4,560 raw observations** across 3 randomized sessions and eight prime sizes.
-
-On the recorded virtualized AMD EPYC / GCC 14.2 environment:
-
-- reusable planning improves Bluestein by roughly **3.09–4.47×** versus the historical setup-inclusive API;
-- reusable planning improves Rader by roughly **2.35–7.61×**;
-- plan construction generally amortizes in about **0.8–3.3 transforms**;
-- at **N=17**, Rader's direct 16-point cyclic convolution is **4.34× faster** than planned Bluestein's 64-point convolution;
-- at **N=257**, Rader's direct 256-point cyclic convolution is **4.33× faster** than planned Bluestein's 1024-point convolution;
-- when both reductions use the same power-of-two convolution length, the differences become small: Rader wins N=31 by ~1.8%, Bluestein wins N=61, 127, 509, and 1009 by roughly 0.8–1.6%, and N=4093 is statistically unresolved;
-- the best first-principles planned reduction is about **1.28–3.65× slower** than FFTW `MEASURE` across the formal prime matrix.
-
-This materially revises the earlier v2 observation that Rader beat Bluestein at N=509 and 1009: those measurements used the legacy setup-inclusive APIs. Once reusable planning is normalized, **Bluestein is slightly faster at both sizes in the v6 corpus**. That is a central research result: lifecycle semantics can change an apparent algorithm ranking.
-
-Full derivation and buffer/memory contracts: [`docs/ARBITRARY_PLANS.md`](docs/ARBITRARY_PLANS.md).
-
-### v5 — SIMD radix-2 codelets
-
-The v5 corpus contains **4,032 observations**. The best explicit SIMD codelet is **1.747–2.104× faster** than the merged v3 plan and closes roughly **57.9–68.2%** of its latency gap to FFTW `MEASURE`. AVX2 wins the recorded small/medium sizes while AVX-512 wins the larger sizes; the experimental auto-tuner is intentionally documented as imperfect.
-
-### v4 — FFTW production baseline
-
-The v4 corpus contains **3,456 observations**. FFTW `MEASURE` is much faster in steady-state execution, but cold planning can cost tens of milliseconds to seconds and require tens of thousands to millions of transforms to amortize over `ESTIMATE`.
-
-### Earlier milestones
-
-- v3 — reusable planning and specialized real-input transforms;
-- v2 — broad algorithm timing, structural complexity, numerical accuracy, and initial Rader/Bluestein observations;
-- v1 — dependency-free multi-algorithm baseline.
-
-See [`results/SUMMARY.md`](results/SUMMARY.md) for the evidence-backed history.
-
-## Research frontier
-
-Important next work includes:
-
-- reusable **mixed-radix convolution plans** so Rader is not forced through power-of-two zero padding when `p-1` factors well;
-- generated small-N/mixed-radix codelets and schedule selection;
-- vectorized real-input recombination and arbitrary-length SIMD kernels;
-- cache-blocked, four-step, six-step, and cache-oblivious large transforms;
-- Apple Accelerate/vDSP, Intel oneMKL, and pocketfft backends;
-- Arm NEON/SVE plus named physical x86-64/Arm baselines;
-- hardware performance counters;
-- persisted/statistically robust tuning wisdom;
-- `FFTW_PATIENT` / `EXHAUSTIVE` and wisdom persistence;
-- multiple precisions and arbitrary-precision reference arithmetic;
-- batched, multidimensional, multithreaded, and GPU transforms.
-
-## Research integrity
-
-Headline results require raw data, exact source/binary/runtime provenance, sample/session counts, uncertainty analysis, and explicit timing semantics. Planned comparisons must state what is persistent and what scratch is caller-owned. Vendor comparisons additionally require planner, normalization, allocation/alignment, representation, and threading semantics. Architecture claims require explicit ISA controls and runtime capability gates.
-
-See [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md), [`docs/ARBITRARY_PLANS.md`](docs/ARBITRARY_PLANS.md), [`docs/SIMD_KERNELS.md`](docs/SIMD_KERNELS.md), [`docs/VENDOR_BENCHMARKS.md`](docs/VENDOR_BENCHMARKS.md), and [`CONTRIBUTING.md`](CONTRIBUTING.md).
+See [`docs/LEGACY_RESEARCH.md`](docs/LEGACY_RESEARCH.md) for the concrete migration manifest.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [`LICENSE`](LICENSE).
