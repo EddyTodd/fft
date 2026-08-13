@@ -53,6 +53,10 @@ private:
         if (small_codelet_supported(n)) { node->leaf = true; node->radix = n; node->m = 1; node->codelet = std::make_unique<SmallDftCodelet<T>>(n); return node; }
         const auto radix = choose_small_radix(n);
         if (radix == 0) {
+            // A non-codelet prime/rough factor remains a planned direct leaf:
+            // precompute its complete DFT matrix once so execution performs no
+            // allocation or trigonometric setup. Structural top-level planning
+            // still prefers Bluestein for rough composites/primes.
             node->leaf = true;
             node->radix = n;
             node->m = 1;

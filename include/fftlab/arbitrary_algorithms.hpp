@@ -73,6 +73,7 @@ template <FftScalar T>
             matrix[n1 * factor_b + n2] = input[index];
         }
     }
+    // Transform rows (factor_b) and columns (factor_a); no cross twiddles appear.
     for (std::size_t n1 = 0; n1 < factor_a; ++n1) {
         VectorT<T> row(factor_b);
         for (std::size_t n2 = 0; n2 < factor_b; ++n2) row[n2] = matrix[n1 * factor_b + n2];
@@ -89,6 +90,7 @@ template <FftScalar T>
     for (std::size_t k1 = 0; k1 < factor_a; ++k1)
         for (std::size_t k2 = 0; k2 < factor_b; ++k2)
             output[(k1 * factor_b + k2 * factor_a) % n] = matrix[k1 * factor_b + k2];
+    // Each dimension's inverse was already normalized, yielding 1/N total.
     return output;
 }
 template <FftScalar T>
@@ -214,5 +216,6 @@ template <FftScalar T>
 [[nodiscard]] VectorT<T> transform(const VectorT<T>& input, Algo a, bool inverse) {
     return transform(input, a, inverse ? Direction::Inverse : Direction::Forward);
 }
+
 
 } // namespace fftlab

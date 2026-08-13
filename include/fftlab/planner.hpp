@@ -113,6 +113,10 @@ private:
             } else if constexpr (std::is_same_v<P, MixedRadixPlan<T>> || std::is_same_v<P, GoodThomasPlan<T>>) {
                 if (d == Direction::Forward) plan.forward_inplace(data, scratch); else plan.inverse_inplace(data, scratch);
             } else {
+                // Rader/Bluestein are naturally out-of-place reductions. Use the
+                // first N scratch elements as a temporary output only when enough
+                // workspace exists; callers wanting minimum scratch should use the
+                // explicit out-of-place API.
                 if (scratch.size() < plan.scratch_size() + n_)
                     throw std::invalid_argument("in-place Rader/Bluestein requires scratch_size()+N elements");
                 auto temp = scratch.first(n_);
@@ -129,5 +133,6 @@ private:
     Storage storage_;
 };
 Plan(std::size_t, PlanOptions = {}) -> Plan<double>;
+
 
 } // namespace fftlab

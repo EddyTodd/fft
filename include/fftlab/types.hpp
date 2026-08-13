@@ -130,6 +130,7 @@ inline constexpr std::array<Algo, 12> all_algos{
 
 [[nodiscard]] inline std::size_t modular_inverse(std::size_t a, std::size_t m) {
     if (m == 0) throw std::invalid_argument("modular inverse modulus must be nonzero");
+    // Extended Euclid using signed wide-enough arithmetic for ordinary size_t domains.
     using S = std::int64_t;
     if (a > static_cast<std::size_t>(std::numeric_limits<S>::max()) ||
         m > static_cast<std::size_t>(std::numeric_limits<S>::max()))
@@ -208,5 +209,6 @@ inline constexpr std::array<Algo, 12> all_algos{
         default: return true;
     }
 }
+
 
 } // namespace fftlab

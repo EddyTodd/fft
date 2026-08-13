@@ -58,11 +58,14 @@ private:
         auto work_scratch = buffer.subspan(std::max(a_, b_), std::max(a_, b_));
         for (std::size_t i = 0; i < n_; ++i) matrix[i] = data[input_map_[i]];
 
+        // b-point transforms along rows.
         for (std::size_t n1 = 0; n1 < a_; ++n1) {
             auto row = matrix.subspan(n1 * b_, b_);
             if (direction == Direction::Forward) b_plan_.forward_inplace(row, work_scratch.first(b_));
             else b_plan_.inverse_inplace(row, work_scratch.first(b_));
         }
+        // a-point transforms along columns. Gather/scatter is a permutation only;
+        // there are no Cooley-Tukey twiddle multiplications at this level.
         for (std::size_t k2 = 0; k2 < b_; ++k2) {
             for (std::size_t n1 = 0; n1 < a_; ++n1) work[n1] = matrix[n1 * b_ + k2];
             if (direction == Direction::Forward) a_plan_.forward_inplace(work.first(a_), work_scratch.first(a_));

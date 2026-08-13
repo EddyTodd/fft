@@ -227,6 +227,7 @@ template <FftScalar T>
                                                std::size_t k, Direction d, bool conjugate) {
     const auto kk = k % (n / 4);
     const auto theta = T{2} * std::numbers::pi_v<T> * static_cast<T>(kk) / static_cast<T>(n);
+    // forward t is either 1-i*tan(theta) or cot(theta)-i. Inverse/conjugate flip signs.
     T imag_sign = d == Direction::Forward ? T{-1} : T{1};
     if (conjugate) imag_sign = -imag_sign;
     const T a = z.real(), b = z.imag();
@@ -244,6 +245,7 @@ void modified_split_scaled_core(const VectorT<T>& input, VectorT<T>& scaled, Dir
     scaled.resize(n);
     if (n <= 4) {
         scaled = dft(input, d);
+        // dft() normalizes inverse; recursive modified split must remain unnormalized.
         if (d == Direction::Inverse && n > 0) {
             for (auto& z : scaled) z *= static_cast<T>(n);
         }
@@ -290,5 +292,6 @@ template <FftScalar T>
 [[nodiscard]] VectorT<T> modified_split_radix(const VectorT<T>& input, bool inverse = false) {
     return modified_split_radix(input, inverse ? Direction::Inverse : Direction::Forward);
 }
+
 
 } // namespace fftlab

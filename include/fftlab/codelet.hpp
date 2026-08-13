@@ -65,6 +65,8 @@ struct PlanCapabilities {
 }
 
 [[nodiscard]] inline std::size_t choose_small_radix(std::size_t n) noexcept {
+    // Radix-4 is intentionally preferred over two radix-2 levels; remaining
+    // codelets cover the most useful small prime factors for CPU FFT planning.
     for (const auto r : {4U, 2U, 3U, 5U, 7U}) if (n % r == 0) return r;
     return 0;
 }
@@ -88,6 +90,7 @@ public:
     [[nodiscard]] std::size_t radix() const noexcept { return radix_; }
     [[nodiscard]] std::size_t stored_roots() const noexcept { return roots_.size(); }
 
+    // Allocation-free, trigonometry-free execution after construction.
     void execute(std::span<ComplexT<T>> values, Direction direction) const {
         if (values.size() != radix_) throw std::invalid_argument("SmallDftCodelet buffer size mismatch");
         if (radix_ == 2) {
