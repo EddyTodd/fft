@@ -33,16 +33,27 @@
         "FFTLAB_ENABLE_SANITIZERS": "ON",
         "FFTLAB_WARNINGS_AS_ERRORS": "ON"
       }
+    },
+    {
+      "name": "package",
+      "displayName": "Release Package Install",
+      "inherits": "release",
+      "binaryDir": "${sourceDir}/build/package",
+      "cacheVariables": {
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/build/package-prefix"
+      }
     }
   ],
   "buildPresets": [
     {"name": "dev", "configurePreset": "dev", "configuration": "Debug"},
     {"name": "release", "configurePreset": "release", "configuration": "Release"},
-    {"name": "sanitize", "configurePreset": "sanitize", "configuration": "Debug"}
+    {"name": "sanitize", "configurePreset": "sanitize", "configuration": "Debug"},
+    {"name": "package", "configurePreset": "package", "configuration": "Release", "targets": ["install"]}
   ],
   "testPresets": [
     {"name": "dev", "configurePreset": "dev", "configuration": "Debug", "output": {"outputOnFailure": true}},
     {"name": "release", "configurePreset": "release", "configuration": "Release", "output": {"outputOnFailure": true}},
-    {"name": "sanitize", "configurePreset": "sanitize", "configuration": "Debug", "output": {"outputOnFailure": true}}
+    {"name": "sanitize", "configurePreset": "sanitize", "configuration": "Debug", "output": {"outputOnFailure": true}},
+    {"name": "package", "configurePreset": "package", "configuration": "Release", "output": {"outputOnFailure": true}}
   ]
 }
