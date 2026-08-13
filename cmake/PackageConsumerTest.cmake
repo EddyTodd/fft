@@ -18,6 +18,7 @@ function(register_package_consumer_test name consumer_source_dir)
       "-DPACKAGE_CONSUMER_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}"
       "-DPACKAGE_CONSUMER_GENERATOR_TOOLSET=${CMAKE_GENERATOR_TOOLSET}"
       "-DPACKAGE_CONSUMER_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+      "-DPACKAGE_CONSUMER_CTEST_COMMAND=${CMAKE_CTEST_COMMAND}"
       "-DPACKAGE_CONSUMER_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}"
       "-DPACKAGE_CONSUMER_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}"
       "-DPACKAGE_CONSUMER_OSX_SYSROOT=${CMAKE_OSX_SYSROOT}"
@@ -31,7 +32,8 @@ if(PACKAGE_CONSUMER_RUN)
       PACKAGE_CONSUMER_PROJECT_BINARY_DIR
       PACKAGE_CONSUMER_INSTALL_PREFIX
       PACKAGE_CONSUMER_SOURCE_DIR
-      PACKAGE_CONSUMER_BINARY_DIR)
+      PACKAGE_CONSUMER_BINARY_DIR
+      PACKAGE_CONSUMER_CTEST_COMMAND)
     if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
       message(FATAL_ERROR "Missing package-consumer variable: ${required}")
     endif()
@@ -102,4 +104,14 @@ if(PACKAGE_CONSUMER_RUN)
     list(APPEND build_command --config "${PACKAGE_CONSUMER_CONFIG}")
   endif()
   _package_consumer_execute("consumer build" ${build_command})
+
+  set(test_command
+    "${PACKAGE_CONSUMER_CTEST_COMMAND}"
+    --test-dir "${PACKAGE_CONSUMER_BINARY_DIR}"
+    --output-on-failure
+  )
+  if(PACKAGE_CONSUMER_CONFIG)
+    list(APPEND test_command -C "${PACKAGE_CONSUMER_CONFIG}")
+  endif()
+  _package_consumer_execute("consumer test" ${test_command})
 endif()
