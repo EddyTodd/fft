@@ -69,6 +69,13 @@ fftlab_apply_warnings(fftlab)
 fftlab_apply_sanitizers(fftlab)
 
 if(BUILD_TESTING AND FFTLAB_BUILD_TESTS)
+    include(cmake/HeaderSelfContainment.cmake)
+    add_public_header_self_containment_target(
+        fftlab-header-self-containment
+        fftlab
+        "${CMAKE_CURRENT_SOURCE_DIR}/include")
+    fftlab_apply_warnings(fftlab-header-self-containment)
+
     add_executable(fftlab_core_correctness tests/correctness.cpp)
     target_link_libraries(fftlab_core_correctness PRIVATE fftlab::fftlab)
     target_compile_features(fftlab_core_correctness PRIVATE cxx_std_23)

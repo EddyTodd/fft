@@ -1,0 +1,35 @@
+function(add_public_header_self_containment_target check_target library_target include_root)
+  get_target_property(public_headers "${library_target}" HEADER_SET_public_headers)
+  if(NOT public_headers)
+    message(FATAL_ERROR "${library_target} has no public_headers file set")
+  endif()
+
+  set(output_dir "${CMAKE_CURRENT_BINARY_DIR}/header-self-containment/${check_target}")
+  file(MAKE_DIRECTORY "${output_dir}")
+  set(generated_sources)
+
+  foreach(header IN LISTS public_headers)
+    if(IS_ABSOLUTE "${header}")
+      set(header_path "${header}")
+    else()
+      set(header_path "${CMAKE_CURRENT_SOURCE_DIR}/${header}")
+    endif()
+
+    file(RELATIVE_PATH include_name "${include_root}" "${header_path}")
+    if(include_name MATCHES "^\\.\\.")
+      message(FATAL_ERROR
+        "Public header ${header_path} is outside include root ${include_root}")
+    endif()
+
+    string(REPLACE "\\" "/" include_name "${include_name}")
+    string(MAKE_C_IDENTIFIER "${include_name}" source_id)
+    set(source "${output_dir}/${source_id}.cpp")
+    file(WRITE "${source}" "#include <${include_name}>\n")
+    list(APPEND generated_sources "${source}")
+  endforeach()
+
+  add_library(${check_target} OBJECT ${generated_sources})
+  target_link_libraries(${check_target} PRIVATE ${library_target})
+  target_compile_features(${check_target} PRIVATE cxx_std_23)
+  set_target_properties(${check_target} PROPERTIES CXX_EXTENSIONS OFF)
+endfunction()
