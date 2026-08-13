@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.23)
 
 function(register_package_consumer_test name consumer_source_dir)
+  if(NOT PROJECT_IS_TOP_LEVEL)
+    return()
+  endif()
+
   add_test(
     NAME ${name}
     COMMAND ${CMAKE_COMMAND}
@@ -23,24 +27,48 @@ function(register_package_consumer_test name consumer_source_dir)
 endfunction()
 
 if(PACKAGE_CONSUMER_RUN)
-  foreach(required PACKAGE_CONSUMER_PROJECT_BINARY_DIR PACKAGE_CONSUMER_INSTALL_PREFIX PACKAGE_CONSUMER_SOURCE_DIR PACKAGE_CONSUMER_BINARY_DIR)
+  foreach(required
+      PACKAGE_CONSUMER_PROJECT_BINARY_DIR
+      PACKAGE_CONSUMER_INSTALL_PREFIX
+      PACKAGE_CONSUMER_SOURCE_DIR
+      PACKAGE_CONSUMER_BINARY_DIR)
     if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
       message(FATAL_ERROR "Missing package-consumer variable: ${required}")
     endif()
   endforeach()
+
   function(_package_consumer_execute label)
-    execute_process(COMMAND ${ARGN} RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error)
+    execute_process(
+      COMMAND ${ARGN}
+      RESULT_VARIABLE result
+      OUTPUT_VARIABLE output
+      ERROR_VARIABLE error
+    )
     if(NOT result EQUAL 0)
       message(FATAL_ERROR "${label} failed (${result})\n${output}\n${error}")
     endif()
   endfunction()
-  file(REMOVE_RECURSE "${PACKAGE_CONSUMER_INSTALL_PREFIX}" "${PACKAGE_CONSUMER_BINARY_DIR}")
-  set(install_command "${CMAKE_COMMAND}" --install "${PACKAGE_CONSUMER_PROJECT_BINARY_DIR}" --prefix "${PACKAGE_CONSUMER_INSTALL_PREFIX}")
+
+  file(REMOVE_RECURSE
+    "${PACKAGE_CONSUMER_INSTALL_PREFIX}"
+    "${PACKAGE_CONSUMER_BINARY_DIR}"
+  )
+
+  set(install_command
+    "${CMAKE_COMMAND}" --install "${PACKAGE_CONSUMER_PROJECT_BINARY_DIR}"
+    --prefix "${PACKAGE_CONSUMER_INSTALL_PREFIX}"
+  )
   if(PACKAGE_CONSUMER_CONFIG)
     list(APPEND install_command --config "${PACKAGE_CONSUMER_CONFIG}")
   endif()
   _package_consumer_execute("package install" ${install_command})
-  set(configure_command "${CMAKE_COMMAND}" -S "${PACKAGE_CONSUMER_SOURCE_DIR}" -B "${PACKAGE_CONSUMER_BINARY_DIR}" "-DCMAKE_PREFIX_PATH=${PACKAGE_CONSUMER_INSTALL_PREFIX}")
+
+  set(configure_command
+    "${CMAKE_COMMAND}"
+    -S "${PACKAGE_CONSUMER_SOURCE_DIR}"
+    -B "${PACKAGE_CONSUMER_BINARY_DIR}"
+    "-DCMAKE_PREFIX_PATH=${PACKAGE_CONSUMER_INSTALL_PREFIX}"
+  )
   if(PACKAGE_CONSUMER_GENERATOR)
     list(APPEND configure_command -G "${PACKAGE_CONSUMER_GENERATOR}")
   endif()
@@ -68,6 +96,7 @@ if(PACKAGE_CONSUMER_RUN)
     list(APPEND configure_command "-DCMAKE_OSX_DEPLOYMENT_TARGET=${PACKAGE_CONSUMER_OSX_DEPLOYMENT_TARGET}")
   endif()
   _package_consumer_execute("consumer configure" ${configure_command})
+
   set(build_command "${CMAKE_COMMAND}" --build "${PACKAGE_CONSUMER_BINARY_DIR}")
   if(PACKAGE_CONSUMER_CONFIG)
     list(APPEND build_command --config "${PACKAGE_CONSUMER_CONFIG}")
