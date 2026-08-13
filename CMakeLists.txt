@@ -96,3 +96,4 @@ install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/fftlabConfigVersion.cmake
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/fftlab
 )
+install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/fftlab)
