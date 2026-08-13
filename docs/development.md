@@ -38,9 +38,9 @@ cmake --build --preset package
 ctest --preset package
 ```
 
-The install exports `fftlab::fftlab`, all permanent public FFT/planning headers, relocatable package/version files, and the project license. The prefix is local to the checkout and can be consumed by a separate project through `CMAKE_PREFIX_PATH` or `fftlab_DIR`.
+The install exports `fftlab::fftlab`, all permanent public FFT/planning headers, relocatable package/version files, and the project license. The 15 supported installed headers are an explicit `public_headers` CMake file set, so an internal or experimental header cannot become installed API merely by appearing under `include/fftlab/`. The prefix is local to the checkout and can be consumed by a separate project through `CMAKE_PREFIX_PATH` or `fftlab_DIR`.
 
-Normal non-sanitized standalone CTest graphs also run `fftlab.package-consumer`. The test installs the current build into an isolated prefix, configures a separate project with `find_package(fftlab 1 CONFIG REQUIRED)`, and compiles it against the installed `fftlab::fftlab` target. This catches missing headers and non-relocatable export metadata that source-tree correctness tests cannot detect. Sanitizer configurations omit this downstream distribution smoke because sanitizer runtime requirements are a separate consumer contract.
+Normal non-sanitized standalone CTest graphs also run `fftlab.package-consumer`. The test installs the current build into an isolated prefix, configures a separate project with `find_package(fftlab 1 CONFIG REQUIRED)`, and compiles it against the installed `fftlab::fftlab` target. The consumer includes all 15 installed headers, so the manifest, exported target, and installed tree must agree. Sanitizer configurations omit this downstream distribution smoke because sanitizer runtime requirements are a separate consumer contract.
 
 ## Research boundary
 
