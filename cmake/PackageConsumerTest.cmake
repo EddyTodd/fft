@@ -11,6 +11,7 @@ function(register_package_consumer_test name consumer_source_dir)
       -DPACKAGE_CONSUMER_RUN=ON
       "-DPACKAGE_CONSUMER_PROJECT_BINARY_DIR=${CMAKE_BINARY_DIR}"
       "-DPACKAGE_CONSUMER_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/package-consumer-prefix"
+      "-DPACKAGE_CONSUMER_RELOCATED_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/package-consumer-relocated-prefix"
       "-DPACKAGE_CONSUMER_SOURCE_DIR=${consumer_source_dir}"
       "-DPACKAGE_CONSUMER_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/package-consumer-build"
       "-DPACKAGE_CONSUMER_CONFIG=$<CONFIG>"
@@ -31,6 +32,7 @@ if(PACKAGE_CONSUMER_RUN)
   foreach(required
       PACKAGE_CONSUMER_PROJECT_BINARY_DIR
       PACKAGE_CONSUMER_INSTALL_PREFIX
+      PACKAGE_CONSUMER_RELOCATED_PREFIX
       PACKAGE_CONSUMER_SOURCE_DIR
       PACKAGE_CONSUMER_BINARY_DIR
       PACKAGE_CONSUMER_CTEST_COMMAND)
@@ -53,6 +55,7 @@ if(PACKAGE_CONSUMER_RUN)
 
   file(REMOVE_RECURSE
     "${PACKAGE_CONSUMER_INSTALL_PREFIX}"
+    "${PACKAGE_CONSUMER_RELOCATED_PREFIX}"
     "${PACKAGE_CONSUMER_BINARY_DIR}"
   )
 
@@ -65,11 +68,26 @@ if(PACKAGE_CONSUMER_RUN)
   endif()
   _package_consumer_execute("package install" ${install_command})
 
+  file(RENAME
+    "${PACKAGE_CONSUMER_INSTALL_PREFIX}"
+    "${PACKAGE_CONSUMER_RELOCATED_PREFIX}"
+    RESULT relocation_result
+  )
+  if(NOT relocation_result STREQUAL "0")
+    message(FATAL_ERROR "package relocation failed: ${relocation_result}")
+  endif()
+  if(EXISTS "${PACKAGE_CONSUMER_INSTALL_PREFIX}")
+    message(FATAL_ERROR "package staging prefix still exists after relocation")
+  endif()
+  if(NOT EXISTS "${PACKAGE_CONSUMER_RELOCATED_PREFIX}")
+    message(FATAL_ERROR "relocated package prefix is missing")
+  endif()
+
   set(configure_command
     "${CMAKE_COMMAND}"
     -S "${PACKAGE_CONSUMER_SOURCE_DIR}"
     -B "${PACKAGE_CONSUMER_BINARY_DIR}"
-    "-DCMAKE_PREFIX_PATH=${PACKAGE_CONSUMER_INSTALL_PREFIX}"
+    "-DCMAKE_PREFIX_PATH=${PACKAGE_CONSUMER_RELOCATED_PREFIX}"
   )
   if(PACKAGE_CONSUMER_GENERATOR)
     list(APPEND configure_command -G "${PACKAGE_CONSUMER_GENERATOR}")
