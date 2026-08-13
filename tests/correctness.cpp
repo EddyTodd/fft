@@ -40,6 +40,7 @@ void oracle_matrix() {
     }
 }
 
+
 template<FftScalar T>
 void catalog_oracle() {
     std::mt19937_64 rng(0xCA7A106);
