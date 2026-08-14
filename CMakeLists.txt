@@ -6,7 +6,7 @@ include(CMakePackageConfigHelpers)
 include(CTest)
 
 option(FFTLAB_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
-option(FFTLAB_WARNINGS_AS_ERRORS "Treat fftlab warnings as errors" OFF)
+option(FFTLAB_WARNINGS_AS_ERRORS "Treat fftlab warnings as errors" ${PROJECT_IS_TOP_LEVEL})
 option(FFTLAB_BUILD_TESTS "Build deterministic FFT correctness tests" ${PROJECT_IS_TOP_LEVEL})
 
 function(fftlab_apply_warnings target)
@@ -28,6 +28,13 @@ function(fftlab_apply_sanitizers target)
         target_compile_options(${target} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
         target_link_options(${target} PRIVATE -fsanitize=address,undefined)
     endif()
+endfunction()
+
+function(fftlab_configure_private_target target)
+    target_compile_features(${target} PRIVATE cxx_std_23)
+    set_target_properties(${target} PROPERTIES CXX_EXTENSIONS OFF)
+    fftlab_apply_warnings(${target})
+    fftlab_apply_sanitizers(${target})
 endfunction()
 
 add_library(fftlab src/kernel.cpp)
@@ -78,18 +85,11 @@ if(BUILD_TESTING AND FFTLAB_BUILD_TESTS)
 
     add_executable(fftlab_core_correctness tests/correctness.cpp)
     target_link_libraries(fftlab_core_correctness PRIVATE fftlab::fftlab)
-    target_compile_features(fftlab_core_correctness PRIVATE cxx_std_23)
-    set_target_properties(fftlab_core_correctness PROPERTIES CXX_EXTENSIONS OFF)
+    fftlab_configure_private_target(fftlab_core_correctness)
 
     add_executable(fftlab_kernel_correctness tests/kernel_test.cpp)
     target_link_libraries(fftlab_kernel_correctness PRIVATE fftlab::fftlab)
-    target_compile_features(fftlab_kernel_correctness PRIVATE cxx_std_23)
-    set_target_properties(fftlab_kernel_correctness PROPERTIES CXX_EXTENSIONS OFF)
-
-    foreach(target fftlab_core_correctness fftlab_kernel_correctness)
-        fftlab_apply_warnings(${target})
-        fftlab_apply_sanitizers(${target})
-    endforeach()
+    fftlab_configure_private_target(fftlab_kernel_correctness)
 
     add_test(NAME fftlab_core_correctness COMMAND fftlab_core_correctness)
     add_test(NAME fftlab_kernel_correctness COMMAND fftlab_kernel_correctness)
