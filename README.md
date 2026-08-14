@@ -1,10 +1,21 @@
 # fftlab
 
-`fftlab` is a dependency-free C++23 library of one-dimensional CPU Fourier-transform algorithms and reusable plans for binary32 and binary64.
+`fftlab` is a dependency-free C++23 library of sequential one-dimensional CPU Fourier transforms for binary32 and binary64. It provides representative transform mechanisms, reusable structural plans, SIMD kernels, deterministic numerical correctness, and an installable API. Empirical performance research lives in [`EddyTodd/bench`](https://github.com/EddyTodd/bench).
 
-This repository owns transform mechanisms, structural planning, numerical correctness, SIMD implementation, and theory. Empirical timing, vendor comparisons, campaign orchestration, statistics, provenance, and reports live in [`EddyTodd/bench`](https://github.com/EddyTodd/bench).
+## Use
 
-## v1 catalog
+```cpp
+#include <fftlab/fftlab.hpp>
+
+std::vector<fftlab::Complex<double>> values = /* ... */;
+fftlab::fft_radix2_iterative(values, fftlab::Direction::forward);
+```
+
+For repeated transforms, use a reusable plan so twiddles, structural choices, and scratch requirements are prepared once rather than regenerated per execution.
+
+## Scope
+
+Version 1 covers sequential 1D CPU transforms:
 
 - direct DFT;
 - iterative and recursive radix-2;
@@ -12,23 +23,21 @@ This repository owns transform mechanisms, structural planning, numerical correc
 - radix-4;
 - classical and modified split-radix;
 - mixed-radix Cooley-Tukey;
-- Good-Thomas / PFA;
+- Good-Thomas/PFA;
 - Rader;
 - Bluestein;
-- reusable small codelets for radices 2/3/4/5/7;
-- reusable radix-2, mixed-radix, Good-Thomas, Rader, Bluestein, real-radix2, and arbitrary structural plans;
-- explicit binary64 scalar/AVX2/AVX-512 radix-2 kernels;
+- reusable radix 2/3/4/5/7 codelets;
+- radix-2, mixed-radix, Good-Thomas, Rader, Bluestein, real-radix2, and arbitrary plans;
+- binary64 scalar/AVX2/AVX-512 radix-2 kernels;
 - deterministic long-double DFT oracle utilities.
 
-The arbitrary-length `Plan<T>` chooses a deterministic structural mechanism and exposes capabilities/options for explicit family selection. Plan execution uses caller-owned scratch where needed and avoids per-execution table regeneration/allocation.
+Multidimensional, batched, threaded, distributed, GPU, NUFFT, and empirical auto-tuning domains are outside v1.
 
-See `docs/API.md`, `docs/THEORY.md`, and `docs/V1_SCOPE.md`.
-
-## Transform convention
+## Convention
 
 Forward transforms use `exp(-2*pi*i*k*n/N)` and are unnormalized. Inverse transforms use the positive exponent and divide by `N`.
 
-## Build and test
+## Build
 
 ```bash
 cmake --preset dev
@@ -36,7 +45,7 @@ cmake --build --preset dev
 ctest --preset dev
 ```
 
-Release, sanitizer, and package presets are also provided. The permanent deterministic suite covers f32/f64, arbitrary structural domains, forward/inverse identities, real transforms, codelets, and scalar/AVX equivalence where supported.
+`release`, `sanitize`, and `package` presets use the same interface.
 
 ## Install
 
@@ -45,18 +54,26 @@ cmake --preset package
 cmake --build --preset package
 ```
 
+Consumer:
+
 ```cmake
 find_package(fftlab 1 CONFIG REQUIRED)
 target_link_libraries(your_target PRIVATE fftlab::fftlab)
 ```
 
-The core has no required FFTW dependency.
+The core library has no required FFTW or vendor dependency.
 
-## Scope
+## Documentation
 
-Version 1 is sequential 1D CPU Fourier transforms. Multidimensional/batched/threaded/distributed/GPU transforms, DCT/DST, NUFFT, sparse FFTs, generated codelet systems, additional SIMD architectures, and empirical auto-tuning are post-v1 domains.
+- [`docs/api.md`](docs/api.md) — public transform and plan API
+- [`docs/theory.md`](docs/theory.md) — transform mechanisms and derivations
+- [`docs/arbitrary-plans.md`](docs/arbitrary-plans.md) — arbitrary-length planning
+- [`docs/real-plans.md`](docs/real-plans.md) — real-transform planning
+- [`docs/simd.md`](docs/simd.md) — architecture-specific kernels
+- [`docs/scope.md`](docs/scope.md) — v1 boundary
+- [`docs/references.md`](docs/references.md) — literature
 
-Algorithm crossover, plan setup-versus-reuse, real-transform performance, explicit SIMD timing, and FFTW/vendor comparisons are research questions for `EddyTodd/bench`, using this stable library API.
+Crossover analysis, plan setup-versus-reuse studies, vendor comparisons, SIMD timing, statistics, provenance, and reports are intentionally centralized in [`EddyTodd/bench`](https://github.com/EddyTodd/bench).
 
 ## License
 
