@@ -1,121 +1,82 @@
-# fftlab v1 API contract
+# Public API
 
-## Precision and types
+## Headers
 
-The stable v1 scalar concept accepts exactly `float` and `double`.
+Use `<fftlab/fftlab.hpp>` for the complete installed API, or include focused headers directly.
 
-- `ComplexT<float>` / `VectorT<float>`: binary32 complex data.
-- `ComplexT<double>` / `VectorT<double>`: binary64 complex data.
-- `Complex32`, `Vector32`, `Complex64`, `Vector64`: convenience aliases.
-- historical `Complex` and `Vector`: binary64 compatibility aliases.
+- `types.hpp` — scalar concepts, complex/vector aliases, algorithm identifiers, and small number-theory helpers;
+- `power2_algorithms.hpp` — direct DFT and power-of-two transform families;
+- `arbitrary_algorithms.hpp` — mixed-radix, Good-Thomas, Rader, Bluestein, and generic dispatch;
+- `plan.hpp`, `mixed_plan.hpp`, `good_thomas_plan.hpp`, `arbitrary_plan.hpp`, `convolution_plan.hpp`, `planner.hpp` — reusable structural plans;
+- `codelet.hpp` — reusable small-radix codelets;
+- `kernel.hpp` — explicit binary64 scalar/AVX radix-2 kernels;
+- `oracle.hpp` — deterministic long-double DFT reference utilities.
 
-## Mathematical convention
+## Scalar and container types
 
-Forward:
+The library is precision-explicit:
 
-`X[k] = sum_{n=0}^{N-1} x[n] exp(-2*pi*i*k*n/N)`.
+```cpp
+fftlab::ComplexT<float>
+fftlab::ComplexT<double>
+fftlab::VectorT<float>
+fftlab::VectorT<double>
 
-Inverse uses the positive exponential and applies `1/N` normalization. All algorithm families use this same convention.
+fftlab::Complex32
+fftlab::Complex64
+fftlab::Vector32
+fftlab::Vector64
+```
 
-## Free algorithms
+There are intentionally no unqualified historical `Complex` or `Vector` aliases in v1.
 
-The free functions are primarily algorithm/reference interfaces. They may allocate temporary vectors and may construct roots/twiddles while executing.
+## Transform convention
 
-Available mechanisms:
+`Direction::Forward` uses `exp(-2*pi*i*k*n/N)` and is unnormalized. `Direction::Inverse` uses the positive exponent and divides by `N`.
 
-- `dft`
-- `radix2`
-- `recursive`
-- `stockham`
-- `radix4`
-- `split_radix`
-- `modified_split_radix`
-- `mixed`
-- `good_thomas`
-- `rader`
-- `bluestein`
-- `transform`
+Most transform functions also provide a boolean convenience overload where `true` means inverse.
 
-`transform(input, Algo::Auto)` is a simple structural function dispatcher. Repeated workloads should prefer `Plan<T>`.
+## Algorithm catalog and dispatch
 
-### Zero and one length
+`Algorithm` identifies the generic transform families. `all_algorithms` is the complete stable catalog.
 
-Free transforms accept `N=0` and return empty output. `N=1` is identity. Domain-specific algorithms still reject invalid nontrivial sizes (for example, radix-2 rejects non-power-of-two `N>1`).
+- `algorithm_name(Algorithm)` returns the canonical CLI/report name;
+- `parse_algorithm(name)` parses canonical names plus a small set of documented shorthand names;
+- `supports_algorithm(algorithm, n)` reports structural domain support;
+- `transform(input, algorithm, direction)` executes the selected family;
+- `Algorithm::Auto` chooses a deterministic structural mechanism from the input length.
+
+Unsupported explicit choices throw `std::invalid_argument`; they never silently fall back under the requested name.
+
+The generic catalog currently includes direct DFT, radix-2 iterative/recursive, Stockham, radix-4, classical and modified split-radix, mixed-radix, Good-Thomas, Rader, and Bluestein.
 
 ## Reusable plans
 
-### `Radix2Plan<T>`
+Use plans for repeated transforms. Plans precompute structural choices, permutation data, twiddles/codelets, and scratch requirements so execution does not regenerate tables or allocate hidden work buffers.
 
-Domain: power-of-two `N>=1`.
+`Plan<T>` is the deterministic arbitrary-length planner. It exposes the selected `PlanAlgorithm`, size, scratch requirement, and forward/inverse execution.
 
-Persistent state: bit-reversal permutation and forward twiddles.
+Specialized plans remain available when a caller wants an explicit mechanism:
 
-Execution: in-place or out-of-place; no caller scratch; no execution allocation/trigonometric setup.
+- `Radix2Plan<T>`;
+- `RealRadix2Plan<T>`;
+- `MixedRadixPlan<T>`;
+- `GoodThomasPlan<T>`;
+- `RaderPlan<T>` / `BluesteinPlan<T>` through arbitrary/convolution planning;
+- small-radix codelets.
 
-### `RealRadix2Plan<T>`
+See [`arbitrary-plans.md`](arbitrary-plans.md) and [`real-plans.md`](real-plans.md).
 
-Domain: power-of-two real `N>=1`.
+## Explicit SIMD kernels
 
-Forward layout: `N/2+1` nonredundant complex bins (`1` bin for `N=1`).
+`KernelRadix2Plan` is the binary64 fixed-width kernel plan. `KernelIsa` selects scalar, AVX2/FMA, or AVX-512/FMA. `kernel_capabilities()` reports runtime availability; requesting an unavailable ISA throws instead of silently substituting scalar execution.
 
-Inverse consumes exactly that layout. Scratch requirement is `N/2` complex values for `N>1`.
+The core library remains dependency-free and does not require FFTW or another vendor FFT package.
 
-### `SmallDftCodelet<T>`
+## Numerical reference
 
-Radices: 2, 3, 4, 5, 7.
+`oracle.hpp` provides a deterministic long-double DFT reference for correctness work. It is not a performance implementation.
 
-Radix-2/4 use explicit butterflies. Radix-3/5/7 root matrices are precomputed at construction. Execution is allocation-free and trigonometry-free.
+## Research boundary
 
-### `MixedRadixPlan<T>`
-
-Reusable Cooley-Tukey plan using the small-codelet mechanism recursively. Top-level `Plan<T>` chooses it for supported smooth composite structures when PFA is not selected.
-
-Scratch: `N` complex values. Execution allocates no dynamic memory and performs no trigonometric setup.
-
-### `GoodThomasPlan<T>`
-
-Domain: `N=a*b`, `gcd(a,b)=1`, `a,b>1`.
-
-Persistent state includes CRT permutation maps plus reusable row/column plans. The Good-Thomas decomposition introduces no cross-stage twiddle multiplication (`twiddle_count()==0`).
-
-Scratch: `N + 2*max(a,b)` complex values.
-
-### `RaderPlan<T>`
-
-Domain: prime `N>=3`.
-
-Persistent state includes prime permutations, convolution spectrum, and reusable radix-2 convolution plan. If `N-1` is a power of two, the cyclic convolution is executed directly at that length.
-
-### `BluesteinPlan<T>`
-
-Domain: `N>=1`.
-
-Persistent state includes chirps, convolution spectrum, and reusable radix-2 convolution plan.
-
-### `Plan<T>`
-
-Stable arbitrary-length structural planner. `PlanOptions` can force a supported mechanism or use `Structural` selection. The structural policy never times candidate algorithms.
-
-`algorithm()` and `algorithm_name()` expose the actual selection. `plan_capabilities(N)` exposes candidate mechanism domains.
-
-For out-of-place calls allocate `scratch_size()` complex elements. For in-place Rader/Bluestein calls allocate `inplace_scratch_size()` because those reductions require both algorithm scratch and temporary output.
-
-`N=0/1` uses the identity plan.
-
-## SIMD plan
-
-`KernelRadix2Plan` is a binary64-only optional optimized extension. It accepts explicit `Scalar`, `Avx2`, or `Avx512` selection. Runtime capability checks prevent unsupported ISA execution. It performs no empirical tuning.
-
-The portable f32/f64 planner is `Radix2Plan<T>`/`Plan<T>`.
-
-## Aliasing
-
-Use `*_inplace` APIs for explicit in-place execution. Out-of-place APIs are specified for distinct input/output storage. Scratch must not alias active input/output unless a specific function documents otherwise.
-
-## Reuse and concurrency
-
-Plans allocate/precompute only during construction. Execution is logically read-only with respect to plan state. A single plan object may be reused across threads **provided every concurrent call owns distinct mutable input/output/scratch storage**. v1 itself does not create threads or provide an internal thread pool.
-
-## Correctness oracle
-
-`oracle_dft` in `<fftlab/oracle.hpp>` computes the DFT in `long double` and is intended for deterministic subject-specific validation. `ErrorNorms`/`error_norms` provide normalized numerical error summaries. These are correctness utilities, not generic performance-statistics infrastructure.
+Algorithm crossover, setup-versus-reuse, planner policy quality, SIMD timing, vendor comparisons, replication, statistical inference, provenance, evidence, and reports belong in `EddyTodd/bench` and consume this public API.
