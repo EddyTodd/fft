@@ -7,8 +7,8 @@
 ```cpp
 #include <fftlab/fftlab.hpp>
 
-std::vector<fftlab::Complex<double>> values = /* ... */;
-fftlab::fft_radix2_iterative(values, fftlab::Direction::forward);
+fftlab::Vector64 values{{1.0, 0.0}, {2.0, 0.0}, {3.0, 0.0}, {4.0, 0.0}};
+fftlab::radix2_inplace(values, fftlab::Direction::Forward);
 ```
 
 For repeated transforms, use a reusable plan so twiddles, structural choices, and scratch requirements are prepared once rather than regenerated per execution.
