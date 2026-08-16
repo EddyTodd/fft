@@ -8,6 +8,8 @@ include(CTest)
 option(FFTLAB_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(FFTLAB_WARNINGS_AS_ERRORS "Treat fftlab warnings as errors" ${PROJECT_IS_TOP_LEVEL})
 option(FFTLAB_BUILD_TESTS "Build deterministic FFT correctness tests" ${PROJECT_IS_TOP_LEVEL})
+option(FFTLAB_BUILD_EXAMPLES "Build small fftlab usage examples" ${PROJECT_IS_TOP_LEVEL})
+option(FFTLAB_BUILD_PACKAGE_TESTS "Run downstream installed-package validation" OFF)
 
 include(cmake/ProjectOptions.cmake)
 
@@ -45,6 +47,10 @@ target_sources(fftlab PUBLIC
   FILES ${FFTLAB_PUBLIC_HEADERS})
 fftlab_apply_warnings(fftlab)
 fftlab_apply_sanitizers(fftlab)
+
+if(FFTLAB_BUILD_EXAMPLES)
+  add_subdirectory(examples)
+endif()
 
 if(BUILD_TESTING AND FFTLAB_BUILD_TESTS)
   add_subdirectory(tests)

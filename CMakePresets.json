@@ -36,11 +36,12 @@
     },
     {
       "name": "package",
-      "displayName": "Release Package Install",
+      "displayName": "Release Package Validation",
       "inherits": "release",
       "binaryDir": "${sourceDir}/build/package",
       "cacheVariables": {
-        "CMAKE_INSTALL_PREFIX": "${sourceDir}/build/package-prefix"
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/build/package-prefix",
+        "FFTLAB_BUILD_PACKAGE_TESTS": "ON"
       }
     }
   ],

@@ -1,53 +1,36 @@
-# Development workflow
+# Development
 
-`fftlab` uses the shared subject-repository developer workflow.
+A top-level checkout builds the library, deterministic numerical tests, and a small plan example. When `fftlab` is embedded with `add_subdirectory`, tests and examples default off.
 
-## Standard presets
+## Normal workflow
 
-```sh
+```bash
 cmake --preset dev
 cmake --build --preset dev
 ctest --preset dev
 ```
 
-Optimized configuration:
+Use `release` for optimized builds and `sanitize` for ASan/UBSan with warnings-as-errors.
 
-```sh
-cmake --preset release
-cmake --build --preset release
-ctest --preset release
-```
+Important options:
 
-Strict local sanitizer configuration:
+- `FFTLAB_BUILD_TESTS` — deterministic FFT/planner correctness tests;
+- `FFTLAB_BUILD_EXAMPLES` — small standalone usage examples;
+- `FFTLAB_ENABLE_SANITIZERS` — ASan/UBSan on supported non-MSVC compilers;
+- `FFTLAB_WARNINGS_AS_ERRORS` — promote compiler warnings to errors.
 
-```sh
-cmake --preset sanitize
-cmake --build --preset sanitize
-ctest --preset sanitize
-```
+## Installed package validation
 
-The sanitizer preset enables `FFTLAB_ENABLE_SANITIZERS=ON` and `FFTLAB_WARNINGS_AS_ERRORS=ON`.
+Package validation is intentionally separate from the normal test loop:
 
-## Install-package check
-
-The `package` preset installs a Release build into `build/package-prefix`:
-
-```sh
+```bash
 cmake --preset package
 cmake --build --preset package
 ctest --preset package
 ```
 
-The install exports `fftlab::fftlab`, all permanent public FFT/planning headers, relocatable package/version files, and the project license. The 15 supported installed headers are an explicit `public_headers` CMake file set, so an internal or experimental header cannot become installed API merely by appearing under `include/fftlab/`. The prefix is local to the checkout and can be consumed by a separate project through `CMAKE_PREFIX_PATH` or `fftlab_DIR`.
+The package preset enables `FFTLAB_BUILD_PACKAGE_TESTS`, installs into a local prefix, relocates it, and validates a separate `find_package(fftlab CONFIG REQUIRED)` consumer. Ordinary `dev` and `release` tests do not pay that cost.
 
-Normal non-sanitized standalone CTest graphs also run `fftlab.package-consumer`. The test installs the current build into an isolated staging prefix, physically moves the complete install tree to a different sibling prefix, verifies the original path no longer exists, and only then configures/builds a separate project with `find_package(fftlab 1 CONFIG REQUIRED)` before running its CTest suite. The consumer includes all 15 installed headers and constructs the compiled `KernelRadix2Plan` with the portable scalar kernel, verifies the forward transform of a length-4 impulse, and verifies the inverse round trip. This catches absolute-prefix leaks while exercising the header manifest, exported target, linked implementation, and deterministic runtime behavior from the relocated package. Sanitizer configurations omit this downstream distribution smoke because sanitizer runtime requirements are a separate consumer contract.
+Machine/compiler/SDK overrides belong in ignored `CMakeUserPresets.json`; shared presets should remain portable and should not encode workstation-specific vendor FFT or ISA paths.
 
-## Research boundary
-
-The shared presets build and test the permanent v1 library only. Historical research C++ sources under `research/` and Python campaign/analysis programs under `tools/` are migration assets, not part of the normal development graph.
-
-New empirical orchestration belongs in `EddyTodd/bench`; FFT-specific algorithm, planner, numerical-correctness, and kernel work remains here.
-
-## User-local configuration
-
-Put machine/compiler/SDK overrides in `CMakeUserPresets.json`; it is intentionally ignored by Git. Shared presets must remain portable and must not encode a local vendor FFT installation or ISA-specific workstation assumptions.
+Performance experiments belong in `EddyTodd/bench`; transform algorithms, planning, numerical correctness, and kernels remain here.
