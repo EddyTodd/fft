@@ -74,7 +74,7 @@ Planning stays here because decomposition, twiddles, scratch requirements, and s
 ./bench run fft
 ```
 
-## Read more
+## Documentation
 
 - [`docs/theory.md`](docs/theory.md) — mechanisms and derivations
 - [`docs/api.md`](docs/api.md) — public API
