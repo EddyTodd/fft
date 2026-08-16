@@ -1,8 +1,10 @@
-# fftlab
+# fft
 
-`fftlab` is a dependency-free C++23 library of sequential one-dimensional CPU Fourier transforms for binary32 and binary64. It provides representative transform mechanisms, reusable structural plans, SIMD kernels, deterministic numerical correctness, and an installable API. Empirical performance research lives in [`EddyTodd/bench`](https://github.com/EddyTodd/bench).
+A C++23 study of **how different Fourier-transform algorithms actually work and compare** for sequential 1D CPU transforms.
 
-## Use
+This repository owns the FFT/DFT algorithms, reusable plans, numerical validation, and theory. Empirical performance research lives in [`EddyTodd/bench`](https://github.com/EddyTodd/bench).
+
+## Try it
 
 ```cpp
 #include <fftlab/fftlab.hpp>
@@ -11,69 +13,52 @@ fftlab::Vector64 values{{1.0, 0.0}, {2.0, 0.0}, {3.0, 0.0}, {4.0, 0.0}};
 fftlab::radix2_inplace(values, fftlab::Direction::Forward);
 ```
 
-For repeated transforms, use a reusable plan so twiddles, structural choices, and scratch requirements are prepared once rather than regenerated per execution.
+Build and test:
 
-## Scope
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+```
 
-Version 1 covers sequential 1D CPU transforms:
+## Algorithms
+
+The catalog represents important transform mechanisms rather than every FFT variant ever published:
 
 - direct DFT;
 - iterative and recursive radix-2;
-- Stockham radix-2;
+- Stockham;
 - radix-4;
 - classical and modified split-radix;
 - mixed-radix Cooley-Tukey;
-- Good-Thomas/PFA;
+- Good-Thomas / PFA;
 - Rader;
 - Bluestein;
-- reusable radix 2/3/4/5/7 codelets;
-- radix-2, mixed-radix, Good-Thomas, Rader, Bluestein, real-radix2, and arbitrary plans;
-- binary64 scalar/AVX2/AVX-512 radix-2 kernels;
-- deterministic long-double DFT oracle utilities.
+- radix 2/3/4/5/7 codelets;
+- reusable radix-2, mixed-radix, Good-Thomas, Rader, Bluestein, real, and arbitrary-length plans;
+- binary64 scalar/AVX2/AVX-512 radix-2 kernels.
 
-Multidimensional, batched, threaded, distributed, GPU, NUFFT, and empirical auto-tuning domains are outside v1.
+Planning stays here because decomposition, twiddles, scratch requirements, and structural choices are part of the FFT algorithm itself.
 
-## Convention
+## Research
 
-Forward transforms use `exp(-2*pi*i*k*n/N)` and are unnormalized. Inverse transforms use the positive exponent and divide by `N`.
+`bench` studies direct-DFT/FFT crossovers, radix families, factorization effects, mixed-radix versus Good-Thomas, Rader versus Bluestein, setup versus reuse cost, planner quality, real transforms, SIMD benefit, and external baselines such as FFTW when available.
 
-## Build
-
-```bash
-cmake --preset dev
-cmake --build --preset dev
-ctest --preset dev
-```
-
-`release`, `sanitize`, and `package` presets use the same interface.
-
-## Install
+From `bench`, the default study is intended to be:
 
 ```bash
-cmake --preset package
-cmake --build --preset package
+python3 -m benchctl run fft
 ```
 
-Consumer:
+## Read more
 
-```cmake
-find_package(fftlab 1 CONFIG REQUIRED)
-target_link_libraries(your_target PRIVATE fftlab::fftlab)
-```
-
-The core library has no required FFTW or vendor dependency.
-
-## Documentation
-
-- [`docs/api.md`](docs/api.md) — public transform and plan API
-- [`docs/theory.md`](docs/theory.md) — transform mechanisms and derivations
+- [`docs/theory.md`](docs/theory.md) — mechanisms and derivations
+- [`docs/api.md`](docs/api.md) — public API
 - [`docs/arbitrary-plans.md`](docs/arbitrary-plans.md) — arbitrary-length planning
-- [`docs/real-plans.md`](docs/real-plans.md) — real-transform planning
+- [`docs/real-plans.md`](docs/real-plans.md) — real transforms
 - [`docs/simd.md`](docs/simd.md) — architecture-specific kernels
-- [`docs/scope.md`](docs/scope.md) — v1 boundary
+- [`docs/scope.md`](docs/scope.md) — deliberate v1 boundary
 - [`docs/references.md`](docs/references.md) — literature
-
-Crossover analysis, plan setup-versus-reuse studies, vendor comparisons, SIMD timing, statistics, provenance, and reports are intentionally centralized in [`EddyTodd/bench`](https://github.com/EddyTodd/bench).
 
 ## License
 
