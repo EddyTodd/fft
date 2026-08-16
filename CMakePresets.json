@@ -1,54 +1,17 @@
 {
   "version": 4,
-  "cmakeMinimumRequired": {
-    "major": 3,
-    "minor": 23,
-    "patch": 0
-  },
+  "cmakeMinimumRequired": {"major": 3, "minor": 23, "patch": 0},
   "configurePresets": [
-    {
-      "name": "dev",
-      "displayName": "Developer Debug",
-      "binaryDir": "${sourceDir}/build/dev",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
-      }
-    },
-    {
-      "name": "release",
-      "displayName": "Release",
-      "binaryDir": "${sourceDir}/build/release",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
-      }
-    },
-    {
-      "name": "sanitize",
-      "displayName": "Sanitized Debug",
-      "inherits": "dev",
-      "binaryDir": "${sourceDir}/build/sanitize",
-      "cacheVariables": {
-        "FFTLAB_ENABLE_SANITIZERS": "ON",
-        "FFTLAB_WARNINGS_AS_ERRORS": "ON"
-      }
-    },
-    {
-      "name": "package",
-      "displayName": "Release Package Install",
-      "inherits": "release",
-      "binaryDir": "${sourceDir}/build/package",
-      "cacheVariables": {
-        "CMAKE_INSTALL_PREFIX": "${sourceDir}/build/package-prefix"
-      }
-    }
+    {"name": "dev", "displayName": "Developer Debug", "binaryDir": "${sourceDir}/build/dev", "cacheVariables": {"CMAKE_BUILD_TYPE": "Debug", "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"}},
+    {"name": "release", "displayName": "Release", "binaryDir": "${sourceDir}/build/release", "cacheVariables": {"CMAKE_BUILD_TYPE": "Release", "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"}},
+    {"name": "sanitize", "displayName": "Sanitized Debug", "inherits": "dev", "binaryDir": "${sourceDir}/build/sanitize", "cacheVariables": {"FFTLAB_ENABLE_SANITIZERS": "ON", "FFTLAB_WARNINGS_AS_ERRORS": "ON"}},
+    {"name": "package", "displayName": "Release Package Validation", "inherits": "release", "binaryDir": "${sourceDir}/build/package", "cacheVariables": {"CMAKE_INSTALL_PREFIX": "${sourceDir}/build/package-prefix", "FFTLAB_BUILD_PACKAGE_TESTS": "ON"}}
   ],
   "buildPresets": [
     {"name": "dev", "configurePreset": "dev", "configuration": "Debug"},
     {"name": "release", "configurePreset": "release", "configuration": "Release"},
     {"name": "sanitize", "configurePreset": "sanitize", "configuration": "Debug"},
-    {"name": "package", "configurePreset": "package", "configuration": "Release", "targets": ["install"]}
+    {"name": "package", "configurePreset": "package", "configuration": "Release"}
   ],
   "testPresets": [
     {"name": "dev", "configurePreset": "dev", "configuration": "Debug", "output": {"outputOnFailure": true}},
