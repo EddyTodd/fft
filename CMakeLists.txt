@@ -2,15 +2,20 @@ cmake_minimum_required(VERSION 3.23)
 project(fftlab VERSION 1.0.0 LANGUAGES CXX)
 
 include(GNUInstallDirs)
-include(CMakePackageConfigHelpers)
-include(CTest)
 
 option(FFTLAB_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(FFTLAB_WARNINGS_AS_ERRORS "Treat fftlab warnings as errors" ${PROJECT_IS_TOP_LEVEL})
 option(FFTLAB_BUILD_TESTS "Build deterministic FFT correctness tests" ${PROJECT_IS_TOP_LEVEL})
 option(FFTLAB_BUILD_EXAMPLES "Build small fftlab usage examples" ${PROJECT_IS_TOP_LEVEL})
 option(FFTLAB_BUILD_PACKAGE_TESTS "Run downstream installed-package validation" OFF)
+option(FFTLAB_INSTALL "Enable fftlab install/package rules" ${PROJECT_IS_TOP_LEVEL})
 
+if(FFTLAB_BUILD_TESTS)
+  include(CTest)
+endif()
+if(FFTLAB_INSTALL)
+  include(CMakePackageConfigHelpers)
+endif()
 include(cmake/ProjectOptions.cmake)
 
 set(FFTLAB_PUBLIC_HEADERS
@@ -56,4 +61,6 @@ if(BUILD_TESTING AND FFTLAB_BUILD_TESTS)
   add_subdirectory(tests)
 endif()
 
-include(cmake/Install.cmake)
+if(FFTLAB_INSTALL)
+  include(cmake/Install.cmake)
+endif()
