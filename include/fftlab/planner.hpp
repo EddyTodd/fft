@@ -65,6 +65,21 @@ private:
             storage);
     }
 
+    [[nodiscard]] static std::size_t bluestein_workspace(std::size_t n) {
+        if (n <= 1) return 1;
+        if (n > (std::numeric_limits<std::size_t>::max() / 2) + 1)
+            throw std::length_error("FFT planner Bluestein workspace overflow");
+        return next_pow2(2 * n - 1);
+    }
+
+    [[nodiscard]] static std::size_t rader_workspace(std::size_t n) {
+        const auto length = n - 1;
+        if (pow2(length)) return length;
+        if (length > (std::numeric_limits<std::size_t>::max() / 2) + 1)
+            throw std::length_error("FFT planner Rader workspace overflow");
+        return next_pow2(2 * length - 1);
+    }
+
     static Storage make_storage(std::size_t n, PlanOptions options, PlanAlgorithm& algorithm) {
         if (n <= 1) {
             algorithm = PlanAlgorithm::Identity;
@@ -112,8 +127,8 @@ private:
             algorithm = PlanAlgorithm::Bluestein;
             return Storage{std::in_place_type<BluesteinPlan<T>>, n};
         }
-        const auto rader_m = pow2(n - 1) ? n - 1 : next_pow2(2 * (n - 1) - 1);
-        const auto blue_m = next_pow2(2 * n - 1);
+        const auto rader_m = rader_workspace(n);
+        const auto blue_m = bluestein_workspace(n);
         if (rader_m < blue_m) {
             algorithm = PlanAlgorithm::Rader;
             return Storage{std::in_place_type<RaderPlan<T>>, n};
@@ -122,8 +137,8 @@ private:
         return Storage{std::in_place_type<BluesteinPlan<T>>, n};
     }
 
-    void execute(std::span<const ComplexT<T>> input, std::span<ComplexT<T>> output, std::span<ComplexT<T>> scratch,
-                 Direction direction) const {
+    void execute(std::span<const ComplexT<T>> input, std::span<ComplexT<T>> output,
+                 std::span<ComplexT<T>> scratch, Direction direction) const {
         if (input.size() != n_ || output.size() != n_ || scratch.size() < scratch_size_) {
             throw std::invalid_argument("Plan buffer size mismatch");
         }
@@ -137,23 +152,18 @@ private:
                 if constexpr (std::is_same_v<P, std::monostate>) {
                     return;
                 } else if constexpr (std::is_same_v<P, Radix2Plan<T>>) {
-                    if (direction == Direction::Forward) {
-                        plan.forward(input, output);
-                    } else {
-                        plan.inverse(input, output);
-                    }
+                    if (direction == Direction::Forward) plan.forward(input, output);
+                    else plan.inverse(input, output);
                 } else {
-                    if (direction == Direction::Forward) {
-                        plan.forward(input, output, scratch);
-                    } else {
-                        plan.inverse(input, output, scratch);
-                    }
+                    if (direction == Direction::Forward) plan.forward(input, output, scratch);
+                    else plan.inverse(input, output, scratch);
                 }
             },
             storage_);
     }
 
-    void execute_inplace(std::span<ComplexT<T>> data, std::span<ComplexT<T>> scratch, Direction direction) const {
+    void execute_inplace(std::span<ComplexT<T>> data, std::span<ComplexT<T>> scratch,
+                         Direction direction) const {
         if (data.size() != n_ || scratch.size() < inplace_scratch_size_) {
             throw std::invalid_argument("Plan buffer size mismatch");
         }
@@ -164,29 +174,16 @@ private:
                 if constexpr (std::is_same_v<P, std::monostate>) {
                     return;
                 } else if constexpr (std::is_same_v<P, Radix2Plan<T>>) {
-                    if (direction == Direction::Forward) {
-                        plan.forward_inplace(data);
-                    } else {
-                        plan.inverse_inplace(data);
-                    }
+                    if (direction == Direction::Forward) plan.forward_inplace(data);
+                    else plan.inverse_inplace(data);
                 } else if constexpr (std::is_same_v<P, MixedRadixPlan<T>> || std::is_same_v<P, GoodThomasPlan<T>>) {
-                    if (direction == Direction::Forward) {
-                        plan.forward_inplace(data, scratch);
-                    } else {
-                        plan.inverse_inplace(data, scratch);
-                    }
+                    if (direction == Direction::Forward) plan.forward_inplace(data, scratch);
+                    else plan.inverse_inplace(data, scratch);
                 } else {
-                    // Rader/Bluestein are naturally out-of-place reductions. Use the
-                    // first N scratch elements as a temporary output only when enough
-                    // workspace exists; callers wanting minimum scratch should use the
-                    // explicit out-of-place API.
                     auto temp = scratch.first(n_);
                     auto algorithm_scratch = scratch.subspan(n_, scratch_size_);
-                    if (direction == Direction::Forward) {
-                        plan.forward(data, temp, algorithm_scratch);
-                    } else {
-                        plan.inverse(data, temp, algorithm_scratch);
-                    }
+                    if (direction == Direction::Forward) plan.forward(data, temp, algorithm_scratch);
+                    else plan.inverse(data, temp, algorithm_scratch);
                     std::copy(temp.begin(), temp.end(), data.begin());
                 }
             },
