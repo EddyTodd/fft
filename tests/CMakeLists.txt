@@ -15,6 +15,7 @@ endfunction()
 
 fftlab_add_test(core test_correctness.cpp)
 fftlab_add_test(kernel test_kernel.cpp)
+fftlab_add_test(plan-contract test_plan_contract.cpp)
 
 if(FFTLAB_BUILD_PACKAGE_TESTS AND NOT FFTLAB_ENABLE_SANITIZERS)
   include(${PROJECT_SOURCE_DIR}/cmake/PackageConsumerTest.cmake)
