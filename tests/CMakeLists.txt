@@ -13,8 +13,8 @@ function(fftlab_add_test name source)
   add_test(NAME "fftlab.${name}" COMMAND ${target})
 endfunction()
 
-fftlab_add_test(core correctness.cpp)
-fftlab_add_test(kernel kernel_test.cpp)
+fftlab_add_test(core test_correctness.cpp)
+fftlab_add_test(kernel test_kernel.cpp)
 
 if(FFTLAB_BUILD_PACKAGE_TESTS AND NOT FFTLAB_ENABLE_SANITIZERS)
   include(${PROJECT_SOURCE_DIR}/cmake/PackageConsumerTest.cmake)
