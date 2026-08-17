@@ -3,37 +3,9 @@ project(fftlab VERSION 1.0.0 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 
-option(FFTLAB_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
-option(FFTLAB_WARNINGS_AS_ERRORS "Treat fftlab warnings as errors" ${PROJECT_IS_TOP_LEVEL})
-option(FFTLAB_BUILD_TESTS "Build deterministic FFT correctness tests" ${PROJECT_IS_TOP_LEVEL})
-option(FFTLAB_BUILD_EXAMPLES "Build small fftlab usage examples" ${PROJECT_IS_TOP_LEVEL})
-option(FFTLAB_BUILD_PACKAGE_TESTS "Run downstream installed-package validation" OFF)
-option(FFTLAB_INSTALL "Enable fftlab install/package rules" ${PROJECT_IS_TOP_LEVEL})
-
-if(FFTLAB_BUILD_TESTS)
-  include(CTest)
-endif()
-if(FFTLAB_INSTALL)
-  include(CMakePackageConfigHelpers)
-endif()
-include(cmake/ProjectOptions.cmake)
-
-set(FFTLAB_PUBLIC_HEADERS
-  include/fftlab/arbitrary_algorithms.hpp
-  include/fftlab/arbitrary_plan.hpp
-  include/fftlab/codelet.hpp
-  include/fftlab/convolution_plan.hpp
-  include/fftlab/fft.hpp
-  include/fftlab/fftlab.hpp
-  include/fftlab/good_thomas_plan.hpp
-  include/fftlab/kernel.hpp
-  include/fftlab/mixed_plan.hpp
-  include/fftlab/oracle.hpp
-  include/fftlab/plan.hpp
-  include/fftlab/planner.hpp
-  include/fftlab/power2_algorithms.hpp
-  include/fftlab/types.hpp
-  include/fftlab/version.hpp)
+option(FFTLAB_BUILD_TESTS "Build correctness tests" ${PROJECT_IS_TOP_LEVEL})
+option(FFTLAB_BUILD_EXAMPLES "Build usage examples" ${PROJECT_IS_TOP_LEVEL})
+option(FFTLAB_INSTALL "Enable install/package rules" ${PROJECT_IS_TOP_LEVEL})
 
 add_library(fftlab src/kernel.cpp)
 add_library(fftlab::fftlab ALIAS fftlab)
@@ -41,26 +13,44 @@ target_compile_features(fftlab PUBLIC cxx_std_23)
 set_target_properties(fftlab PROPERTIES
   CXX_EXTENSIONS OFF
   VERSION ${PROJECT_VERSION}
-  SOVERSION ${PROJECT_VERSION_MAJOR}
-  EXPORT_NAME fftlab)
+  SOVERSION ${PROJECT_VERSION_MAJOR})
 target_include_directories(fftlab PUBLIC
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
-target_sources(fftlab PUBLIC
-  FILE_SET public_headers TYPE HEADERS
-  BASE_DIRS ${PROJECT_SOURCE_DIR}/include
-  FILES ${FFTLAB_PUBLIC_HEADERS})
-fftlab_apply_warnings(fftlab)
-fftlab_apply_sanitizers(fftlab)
 
 if(FFTLAB_BUILD_EXAMPLES)
   add_subdirectory(examples)
 endif()
 
-if(BUILD_TESTING AND FFTLAB_BUILD_TESTS)
+if(FFTLAB_BUILD_TESTS)
+  enable_testing()
   add_subdirectory(tests)
 endif()
 
 if(FFTLAB_INSTALL)
-  include(cmake/Install.cmake)
+  include(CMakePackageConfigHelpers)
+
+  install(TARGETS fftlab
+    EXPORT fftlabTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+  install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+  install(EXPORT fftlabTargets
+    FILE fftlabTargets.cmake
+    NAMESPACE fftlab::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/fftlab)
+
+  file(WRITE "${PROJECT_BINARY_DIR}/fftlabConfig.cmake"
+    "include(\"\${CMAKE_CURRENT_LIST_DIR}/fftlabTargets.cmake\")\n")
+  write_basic_package_version_file(
+    "${PROJECT_BINARY_DIR}/fftlabConfigVersion.cmake"
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion)
+  install(FILES
+    "${PROJECT_BINARY_DIR}/fftlabConfig.cmake"
+    "${PROJECT_BINARY_DIR}/fftlabConfigVersion.cmake"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/fftlab)
+  install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/fftlab)
 endif()
