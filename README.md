@@ -45,7 +45,7 @@ cmake --build --preset release
 ctest --preset release
 ```
 
-A compile-checked plan example is included. The separate `package` preset validates installation, relocation, and a downstream `find_package` consumer without slowing the ordinary correctness loop.
+The build system is intentionally minimal: `dev` and `release` are the only shared presets, and project-specific CMake is limited to building the library, tests/examples, and optional install rules.
 
 ## Algorithms
 
@@ -68,11 +68,7 @@ Planning stays here because decomposition, twiddles, scratch requirements, and s
 
 ## Research
 
-`bench` studies direct-DFT/FFT crossovers, radix families, factorization effects, mixed-radix versus Good-Thomas, Rader versus Bluestein, setup versus reuse cost, planner quality, real transforms, SIMD benefit, and external baselines:
-
-```bash
-./bench run fft
-```
+Performance measurement belongs outside this repository. `bench` can consume the normal public API, but `fft` does not depend on it.
 
 ## Documentation
 
@@ -81,7 +77,7 @@ Planning stays here because decomposition, twiddles, scratch requirements, and s
 - [`docs/arbitrary-plans.md`](docs/arbitrary-plans.md) — arbitrary-length planning
 - [`docs/real-plans.md`](docs/real-plans.md) — real transforms
 - [`docs/simd.md`](docs/simd.md) — architecture-specific kernels
-- [`docs/development.md`](docs/development.md) — build options and package validation
+- [`docs/development.md`](docs/development.md) — build and install
 - [`docs/scope.md`](docs/scope.md) — deliberate v1 boundary
 - [`docs/references.md`](docs/references.md) — literature
 

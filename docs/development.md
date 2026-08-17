@@ -1,8 +1,8 @@
 # Development
 
-A top-level checkout builds the library, deterministic numerical tests, and a small plan example. When `fftlab` is embedded with `add_subdirectory`, tests, examples, and install rules default off so the dependency does not alter its parent's build surface.
+The build is intentionally small. A top-level checkout builds the library, correctness tests, and example; when embedded with `add_subdirectory`, tests, examples, and install rules default off.
 
-## Normal workflow
+## Build and test
 
 ```bash
 cmake --preset dev
@@ -10,28 +10,24 @@ cmake --build --preset dev
 ctest --preset dev
 ```
 
-Use `release` for optimized builds and `sanitize` for ASan/UBSan with warnings-as-errors.
+Use the `release` preset for optimized builds.
 
-Important options:
+Only three project options are needed:
 
-- `FFTLAB_BUILD_TESTS` — deterministic FFT/planner correctness tests;
-- `FFTLAB_BUILD_EXAMPLES` — small standalone usage examples;
-- `FFTLAB_INSTALL` — install/export/package rules (top-level by default);
-- `FFTLAB_ENABLE_SANITIZERS` — ASan/UBSan on supported non-MSVC compilers;
-- `FFTLAB_WARNINGS_AS_ERRORS` — promote compiler warnings to errors.
+- `FFTLAB_BUILD_TESTS` — build correctness tests;
+- `FFTLAB_BUILD_EXAMPLES` — build the usage example;
+- `FFTLAB_INSTALL` — enable install and `find_package` support.
 
-## Installed package validation
+Compiler warnings, sanitizers, coverage, and other developer policies are left to the parent project or ordinary CMake/compiler flags rather than wrapped in repository-specific helpers.
 
-Package validation is intentionally separate from the normal test loop:
+## Install
 
 ```bash
-cmake --preset package
-cmake --build --preset package
-ctest --preset package
+cmake --preset release
+cmake --build --preset release
+cmake --install build/release --prefix build/install
 ```
 
-The package preset enables `FFTLAB_BUILD_PACKAGE_TESTS`; its package-consumer test installs into an isolated prefix, relocates it, and validates a separate `find_package(fftlab CONFIG REQUIRED)` consumer. Ordinary `dev` and `release` tests do not pay that cost.
+The installed package exports `fftlab::fftlab` for `find_package(fftlab CONFIG REQUIRED)`.
 
-Machine/compiler/SDK overrides belong in ignored `CMakeUserPresets.json`; shared presets should remain portable and should not encode workstation-specific vendor FFT or ISA paths.
-
-Performance experiments belong in `EddyTodd/bench`; transform algorithms, planning, numerical correctness, and kernels remain here.
+Performance measurement does not live in this repository. This project owns transform algorithms, plans, kernels, numerical correctness, and theory.
